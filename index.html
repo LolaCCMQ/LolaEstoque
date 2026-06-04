@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pedidos Central — Lola Bar</title>
+<title>Estoque — Lola Bar</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{--v:#AA2B2B;--ve:#7a1a1a;--rf:#fdf3f3;--rb:#f2dada;--rt:#fde8e8;--rm:#f0b8b8;--tx:#2c1a1a;--ts:#7a5a5a;--vd:#2a6645;--am:#c4852a;}
@@ -262,7 +262,7 @@ const LOGO_SVG=`<?xml version="1.0" encoding="utf-8"?>
 function buildShell(){
   const app=$('#app');app.innerHTML='';
   const tb=div('topbar',[
-    div('logo-area',[div('logo-svg-wrap',null,{html:LOGO_SVG}),div('logo-div'),span('logo-app','Pedidos Central')]),
+    div('logo-area',[div('logo-svg-wrap',null,{html:LOGO_SVG}),div('logo-div'),span('logo-app','Estoque')]),
     span('topbar-date',new Date().toLocaleDateString('pt-BR',{weekday:'short',day:'numeric',month:'short'}))
   ]);
   const menus=[
@@ -274,6 +274,7 @@ function buildShell(){
     ]},
     {s:'Operações',items:[
       {id:'contagem',lb:'📦 Contagem Estoque'},
+      {id:'saidas',lb:'📤 Saída de Estoque'},
       {id:'fornecedores',lb:'🏪 Fornecedores'},
       {id:'pedidos',lb:'🛒 Pedidos'},
     ]},
@@ -292,8 +293,8 @@ function buildShell(){
   app.appendChild(div('app-body',[sb,el('main','main',null,{id:'main'})]));
 }
 
-const TITLES={dashboard:'Dashboard',insumos:'Insumos',preproducoes:'Pré-produções',fichas:'Fichas Técnicas',contagem:'Contagem de Estoque',fornecedores:'Fornecedores',pedidos:'Pedidos'};
-const SUBS={dashboard:'Visão geral das operações',insumos:'Ingredientes e matérias-primas com custo real',preproducoes:'Fichas técnicas dos preparos da cozinha',fichas:'Composição e custo dos pratos do cardápio',contagem:'Registro de estoque do CCMQ e Mac',fornecedores:'Cadastro e gestão de fornecedores',pedidos:'Pedidos entre unidades e Cozinha Central'};
+const TITLES={dashboard:'Dashboard',insumos:'Insumos',preproducoes:'Pré-produções',fichas:'Fichas Técnicas',contagem:'Contagem de Estoque',saidas:'Saída de Estoque',fornecedores:'Fornecedores',pedidos:'Pedidos'};
+const SUBS={dashboard:'Visão geral das operações',insumos:'Ingredientes e matérias-primas com custo real',preproducoes:'Fichas técnicas dos preparos da cozinha',fichas:'Composição e custo dos pratos do cardápio',contagem:'Registro de estoque do CCMQ e Mac',saidas:'Registro de saídas de insumos do estoque',fornecedores:'Cadastro e gestão de fornecedores',pedidos:'Pedidos entre unidades e Cozinha Central'};
 
 function nav(p){PAGE=p;document.querySelectorAll('.ni').forEach(n=>n.classList.toggle('active',n.dataset.page===p));renderPage();}
 
@@ -302,7 +303,7 @@ async function renderPage(){
   main.innerHTML='';
   main.appendChild(div('ph',[el('h2',null,TITLES[PAGE]),el('p',null,SUBS[PAGE])]));
   const body=div(null,null,{id:'pb'});main.appendChild(body);
-  const map={dashboard:pgDash,insumos:pgIns,preproducoes:pgPreps,fichas:pgFichas,contagem:pgCont2,fornecedores:pgFornecedores,pedidos:pgPed};
+  const map={dashboard:pgDash,insumos:pgIns,preproducoes:pgPreps,fichas:pgFichas,contagem:pgCont2,saidas:pgSaidas,fornecedores:pgFornecedores,pedidos:pgPed};
   if(map[PAGE])await map[PAGE](body);
 }
 
@@ -1613,6 +1614,244 @@ async function modalNovoItemEstoque(categoria, onSave){
    FORNECEDORES
 ══════════════════════════════════ */
 let _fornecedores=[];
+
+
+/* ══════════════════════════════════
+   SAÍDA DE ESTOQUE
+══════════════════════════════════ */
+
+async function pgSaidas(c){
+  c.appendChild(ld());
+  try{
+    c.innerHTML='';
+    const bar=div('abar no-print');
+    const btnNova=btn('btn bp','+ Nova saída',()=>modalNovaSaida(()=>pgSaidas(c)));
+    btnNova.style.cssText='padding:10px 22px;font-size:13px;font-weight:800;box-shadow:0 3px 10px rgba(170,43,43,.3)';
+    bar.appendChild(btnNova);
+    c.appendChild(bar);
+
+    const saidas=await db('lola_saidas','GET',null,'?order=data_saida.desc&limit=60');
+    if(!saidas.length){
+      c.appendChild(em('📤','Nenhuma saída registrada ainda'));
+      return;
+    }
+
+    // Agrupar por mês
+    const grupos={};
+    saidas.forEach(s=>{
+      const mes=s.data_saida.substring(0,7);
+      if(!grupos[mes])grupos[mes]=[];
+      grupos[mes].push(s);
+    });
+
+    Object.entries(grupos).forEach(([mes,gSaidas])=>{
+      const [ano,m]=mes.split('-');
+      const label=new Date(ano,parseInt(m)-1,1).toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+      const secT=document.createElement('div');
+      secT.style.cssText='font-size:13px;font-weight:700;color:var(--ts);margin:16px 0 8px;padding-bottom:4px;border-bottom:1.5px solid var(--rb)';
+      secT.textContent=label.charAt(0).toUpperCase()+label.slice(1);
+      c.appendChild(secT);
+
+      c.appendChild(div('tw mb3',mkTable(
+        ['Data','Responsável','Destino','Observações',''],
+        gSaidas.map(s=>{
+          const dataFmt=new Date(s.data_saida+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit'});
+          const destLabels={venda:'🛍️ Venda',evento:'🎪 Evento',descarte:'🗑️ Descarte',outro:'📦 Outro'};
+          return[
+            el('strong',null,dataFmt),
+            el('span',null,s.responsavel),
+            el('span','tss',destLabels[s.destino]||s.destino||'—'),
+            el('span','tss',s.observacoes||'—'),
+            btn('btn bg bsm','📋 Ver',()=>verSaida(s)),
+          ];
+        }),
+        [null,null,null,null,null]
+      )));
+    });
+  }catch(e){c.innerHTML='<p style="color:red;padding:20px">'+e.message+'</p>';}
+}
+
+async function verSaida(saida){
+  const ov=div('ov');const mo=div('mo mol');
+  const dataFmt=new Date(saida.data_saida+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+  mo.appendChild(div('mh',[
+    el('h3',null,'📤 Saída — '+dataFmt),
+    btn('xb','✕',()=>ov.remove())
+  ]));
+  const mb2=div('mb');mb2.appendChild(ld());
+  mo.appendChild(mb2);
+  ov.appendChild(mo);
+  ov.addEventListener('click',e=>{if(e.target===ov)ov.remove();});
+  document.body.appendChild(ov);
+
+  try{
+    const itens=await db('lola_saidas_itens','GET',null,
+      '?saida_id=eq.'+saida.id+'&select=*,lola_estoque_itens!estoque_item_id(nome,unidade,categoria)');
+    mb2.innerHTML='';
+
+    const destLabels={venda:'🛍️ Venda',evento:'🎪 Evento',descarte:'🗑️ Descarte',outro:'📦 Outro'};
+    mb2.appendChild(div('g3 mb3',[
+      div('custo-box',[span('scl','Responsável'),div('bold mt2',saida.responsavel)]),
+      div('custo-box',[span('scl','Destino'),div('bold mt2',destLabels[saida.destino]||saida.destino||'—')]),
+      div('custo-box',[span('scl','Total de itens'),div('bold tv mt2',itens.length+' itens')]),
+    ]));
+
+    if(saida.observacoes){
+      mb2.appendChild(div('al ali mb3',saida.observacoes));
+    }
+
+    mb2.appendChild(div('tw',mkTable(
+      ['Item','Categoria','Qtd','Un','Obs'],
+      itens.map(it=>{
+        const cat=it.lola_estoque_itens?.categoria;
+        return[
+          el('strong',null,it.lola_estoque_itens?.nome||it.nome_item||'—'),
+          cat?el('span','tss',CONT_CATS[cat]||cat):span('tss','—'),
+          el('span','bold tv',N(it.quantidade,1)),
+          it.unidade||it.lola_estoque_itens?.unidade||'—',
+          el('span','tss',it.observacoes||'—'),
+        ];
+      }),
+      [null,null,'tr','tr',null]
+    )));
+  }catch(e){mb2.innerHTML='<p style="color:red">'+e.message+'</p>';}
+
+  mo.appendChild(div('mf',[
+    btn('btn bg','Fechar',()=>ov.remove()),
+    btn('btn bp','🖨️ Imprimir',()=>{
+      db('lola_saidas_itens','GET',null,'?saida_id=eq.'+saida.id+'&select=*,lola_estoque_itens!estoque_item_id(nome,unidade,categoria)').then(itens=>{
+        const w=window.open('','_blank');
+        const rows=itens.map(it=>'<tr><td>'+( it.lola_estoque_itens?.nome||it.nome_item)+'</td><td>'+(CONT_CATS[it.lola_estoque_itens?.categoria]||it.lola_estoque_itens?.categoria||'')+'</td><td style="text-align:right"><strong>'+N(it.quantidade,1)+'</strong></td><td>'+(it.unidade||it.lola_estoque_itens?.unidade||'')+'</td><td>'+(it.observacoes||'')+'</td></tr>').join('');
+        const dataFmt2=new Date(saida.data_saida+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+        w.document.write('<html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;padding:20px}h1{color:#AA2B2B}table{width:100%;border-collapse:collapse}th{background:#AA2B2B;color:#fff;padding:8px;text-align:left}td{padding:8px;border-bottom:1px solid #eee}</style></head><body><h1>📤 Saída de Estoque</h1><p><strong>Data:</strong> '+dataFmt2+'</p><p><strong>Responsável:</strong> '+saida.responsavel+'</p><p><strong>Destino:</strong> '+(saida.destino||'—')+'</p>'+(saida.observacoes?'<p><strong>Obs:</strong> '+saida.observacoes+'</p>':'')+'<table><tr><th>Item</th><th>Categoria</th><th>Qtd</th><th>Un</th><th>Obs</th></tr>'+rows+'</table></body></html>');
+        w.print();
+      });
+    }),
+  ]));
+}
+
+async function modalNovaSaida(onSave){
+  // Buscar todos os itens de estoque
+  const todosItens=await db('lola_estoque_itens','GET',null,'?ativo=eq.true&order=categoria.asc,nome.asc');
+
+  const f={responsavel:'',destino:'venda',data:new Date().toISOString().split('T')[0],observacoes:''};
+  const itensSaida=[]; // {estoque_item_id, nome_item, quantidade, unidade, observacoes}
+  const listaWrap=div(null);
+
+  function rebuildLista(){
+    listaWrap.innerHTML='';
+    if(!itensSaida.length){
+      listaWrap.appendChild(div('tss mt2','Nenhum item adicionado ainda.'));
+      return;
+    }
+    const tbl=document.createElement('table');
+    tbl.style.cssText='width:100%;border-collapse:collapse;margin-top:8px';
+    const thead=document.createElement('thead');
+    const hRow=document.createElement('tr');
+    ['Item','Qtd','Un','Obs',''].forEach((h,i)=>{
+      const th=document.createElement('th');
+      th.style.cssText='padding:6px 8px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--v);background:var(--rt);text-align:'+(i>=1&&i<=2?'right':'left');
+      th.textContent=h;hRow.appendChild(th);
+    });
+    thead.appendChild(hRow);tbl.appendChild(thead);
+    const tbody=document.createElement('tbody');
+    itensSaida.forEach((it,idx)=>{
+      const tr=document.createElement('tr');
+      tr.style.cssText=(idx%2===0?'background:var(--rf)':'background:#fff')+';border-bottom:1px solid var(--rb)';
+
+      const tdNome=document.createElement('td');tdNome.style.cssText='padding:6px 8px;font-size:12px;font-weight:600';
+      tdNome.textContent=it.nome_item;tr.appendChild(tdNome);
+
+      const tdQtd=document.createElement('td');tdQtd.style.cssText='padding:4px 8px;text-align:right';
+      const inpQ=document.createElement('input');inpQ.type='number';inpQ.step='0.5';inpQ.min='0';
+      inpQ.value=it.quantidade||'';inpQ.style.cssText='width:70px;padding:4px 6px;border:1.5px solid var(--rb);border-radius:8px;font-size:12px;text-align:right;font-family:Nunito,sans-serif';
+      inpQ.addEventListener('input',e=>it.quantidade=e.target.value);
+      tdQtd.appendChild(inpQ);tr.appendChild(tdQtd);
+
+      const tdUn=document.createElement('td');tdUn.style.cssText='padding:6px 8px;font-size:12px;color:var(--ts);text-align:right';
+      tdUn.textContent=it.unidade||'';tr.appendChild(tdUn);
+
+      const tdObs=document.createElement('td');tdObs.style.cssText='padding:4px 8px';
+      const inpObs=document.createElement('input');inpObs.type='text';inpObs.placeholder='Obs...';
+      inpObs.value=it.observacoes||'';inpObs.style.cssText='width:100%;padding:4px 6px;border:1.5px solid var(--rb);border-radius:8px;font-size:11px;font-family:Nunito,sans-serif';
+      inpObs.addEventListener('input',e=>it.observacoes=e.target.value);
+      tdObs.appendChild(inpObs);tr.appendChild(tdObs);
+
+      const tdRm=document.createElement('td');tdRm.style.cssText='padding:4px 8px';
+      const rmBtn=btn('btn bd bxs','✕',()=>{itensSaida.splice(idx,1);rebuildLista();});
+      tdRm.appendChild(rmBtn);tr.appendChild(tdRm);
+
+      tbody.appendChild(tr);
+    });
+    tbl.appendChild(tbody);
+    listaWrap.appendChild(tbl);
+  }
+
+  // Seletor de item
+  const selWrap=div('fg2 mt3');
+  const selItem=el('select','fs');
+  selItem.appendChild(el('option',null,'— selecione um item —',{value:''}));
+  // Agrupar por categoria no select
+  const grupos={};
+  todosItens.forEach(it=>{if(!grupos[it.categoria])grupos[it.categoria]=[];grupos[it.categoria].push(it);});
+  Object.entries(CONT_CATS).forEach(([cat,label])=>{
+    const catItens=grupos[cat]||[];
+    if(!catItens.length)return;
+    const og=el('optgroup',null,null,{label:label});
+    catItens.forEach(it=>og.appendChild(el('option',null,it.nome,{value:JSON.stringify({id:it.id,nome:it.nome,unidade:it.unidade})})));
+    selItem.appendChild(og);
+  });
+  const btnAdd=btn('btn bp bsm','+ Adicionar',()=>{
+    if(!selItem.value)return;
+    const data=JSON.parse(selItem.value);
+    // Verificar se já está na lista
+    if(itensSaida.find(i=>i.estoque_item_id===data.id)){alert('Item já adicionado.');return;}
+    itensSaida.push({estoque_item_id:data.id,nome_item:data.nome,quantidade:'',unidade:data.unidade,observacoes:''});
+    rebuildLista();
+    selItem.value='';
+  });
+  selWrap.appendChild(fgrp('Selecionar item',selItem));
+  selWrap.appendChild(div('mt2',btnAdd));
+
+  const inpResp=finp('',f.responsavel,v=>f.responsavel=v);inpResp.placeholder='Seu nome...';
+  const inpData=el('input','fi',null,{type:'date',value:f.data});
+  inpData.addEventListener('change',e=>f.data=e.target.value);
+  const selDestino=fsel('',['venda','evento','descarte','outro'],f.destino,v=>f.destino=v);
+  const inpObs=finp('',f.observacoes,v=>f.observacoes=v);inpObs.placeholder='Motivo, observações...';
+
+  mkModal('📤 Nova Saída de Estoque',[
+    div('fg3',[
+      fgrp('✍️ Responsável',inpResp),
+      fgrp('Data',inpData),
+      fgrp('Destino',selDestino),
+    ]),
+    fgrp('Observações',inpObs),
+    el('hr','dv'),
+    el('strong',null,'Itens retirados',{style:'font-size:13px'}),
+    selWrap,
+    listaWrap,
+  ],async()=>{
+    if(!f.responsavel.trim()){alert('Informe o responsável.');return;}
+    const itensValidos=itensSaida.filter(it=>parseFloat(it.quantidade)>0);
+    if(!itensValidos.length){alert('Adicione pelo menos um item com quantidade.');return;}
+    const[saida]=await db('lola_saidas','POST',{
+      data_saida:f.data,
+      responsavel:f.responsavel,
+      destino:f.destino,
+      observacoes:f.observacoes||null,
+    });
+    await Promise.all(itensValidos.map(it=>db('lola_saidas_itens','POST',{
+      saida_id:saida.id,
+      estoque_item_id:it.estoque_item_id,
+      nome_item:it.nome_item,
+      quantidade:parseFloat(it.quantidade),
+      unidade:it.unidade||null,
+      observacoes:it.observacoes||null,
+    })));
+    onSave&&onSave();
+  },'mo mol');
+  rebuildLista();
+}
 
 async function pgFornecedores(c){
   c.appendChild(ld());
