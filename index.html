@@ -3107,6 +3107,9 @@ async function modalNovoPedido(){
 
   let _respPed='';
   let _obsPed='';
+  let _dataPed=TD();
+  const inpDataPed=el('input','fi',null,{type:'date',value:_dataPed});
+  inpDataPed.addEventListener('change',e=>_dataPed=e.target.value);
   const obsInpPed=finp('',_obsPed,v=>{_obsPed=v;},'text');
   obsInpPed.placeholder='Observações opcionais...';
   const inpRespPed=el('input','fi',null,{type:'text',placeholder:'Seu nome (obrigatório)'});
@@ -3118,7 +3121,7 @@ async function modalNovoPedido(){
   mkModal('🛒 Novo Pedido',[
     div('fg2',[
       fgrp('Destino',destSel),
-      fgrp('Data',finp('',TD(),v=>{},'date')),
+      fgrp('Data',inpDataPed),
     ]),
     destNomeWrap,
     el('hr','dv'),
@@ -3150,7 +3153,7 @@ async function modalNovoPedido(){
       unidade:destino,
       destinatario:destino==='terceiro'?destinatario:null,
       status:'rascunho',
-      data_pedido:TD(),
+      data_pedido:_dataPed||TD(),
       valor_total:total,
       observacoes:obs||null,
       responsavel:_respPed,
