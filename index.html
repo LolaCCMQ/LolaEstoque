@@ -116,6 +116,36 @@ td .sub{font-size:10px;color:var(--ts);margin-top:2px;}
 .eok{color:var(--vd);font-weight:700;} .ebx{color:var(--am);font-weight:700;} .ecr{color:#dc2626;font-weight:700;}
 .custo-box{background:var(--rf);border:1.5px solid var(--rb);border-radius:10px;padding:12px 16px;margin-top:12px;}
 @media print{.sidebar,.topbar,.no-print{display:none!important;}.main{margin:0!important;padding:0!important;}body{background:#fff;}}
+
+/* ── MOBILE ─────────────────────────────────────────────── */
+.ham{display:none;background:none;border:none;cursor:pointer;padding:8px;color:var(--v)}
+.mob-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:199}
+@media(max-width:768px){
+  .shell{flex-direction:column}
+  .sidebar{
+    position:fixed;top:0;left:0;bottom:0;width:260px;z-index:200;
+    transform:translateX(-100%);transition:transform .25s ease;
+    box-shadow:4px 0 20px rgba(0,0,0,.15);
+  }
+  .sidebar.open{transform:translateX(0)}
+  .mob-overlay.open{display:block}
+  .ham{display:flex;align-items:center;justify-content:center}
+  .topbar{padding:0 12px;height:52px;gap:8px}
+  .topbar .logo{height:30px}
+  .topbar h1{font-size:14px}
+  .main{margin-left:0!important;padding:12px!important;min-height:100vh}
+  .abar{flex-wrap:wrap;gap:8px}
+  .tabs{flex-wrap:wrap;gap:4px}
+  .tp{font-size:11px;padding:0 10px;height:28px}
+  .tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table{min-width:500px}
+  .mo{width:95vw!important;max-width:95vw!important;margin:10px auto}
+  .moxl{width:95vw!important;max-width:95vw!important}
+  .fg2,.fg3{grid-template-columns:1fr!important}
+  .g3{grid-template-columns:1fr!important}
+  .custo-box{padding:10px 12px}
+  h2{font-size:20px}
+}
 </style>
 </head>
 <body>
@@ -175,6 +205,7 @@ const LOGO_SVG=`<?xml version="1.0" encoding="utf-8"?>
 	 viewBox="0 0 792 612" style="enable-background:new 0 0 792 612;" xml:space="preserve">
 <style type="text/css">
 	.st0{fill:#AA2B2B;}
+
 </style>
 <g id="XMLID_2_">
 	<g id="XMLID_16_">
@@ -264,12 +295,25 @@ const LOGO_SVG=`<?xml version="1.0" encoding="utf-8"?>
 </svg>`;
 
 /* ── SHELL ── */
-function buildShell(){
+ function buildShell(){
   const app=$('#app');app.innerHTML='';
-  const tb=div('topbar',[
-    div('logo-area',[div('logo-svg-wrap',null,{html:LOGO_SVG}),div('logo-div'),span('logo-app','Estoque')]),
-    span('topbar-date',new Date().toLocaleDateString('pt-BR',{weekday:'short',day:'numeric',month:'short'}))
-  ]);
+  // Overlay mobile
+  const mobOv=div('mob-overlay');
+  app.appendChild(mobOv);
+  function openSidebar(){sb.classList.add('open');mobOv.classList.add('open');}
+  function closeSidebar(){sb.classList.remove('open');mobOv.classList.remove('open');}
+  mobOv.addEventListener('click',closeSidebar);
+
+  // Topbar com hamburguer
+  const hamBtn=document.createElement('button');
+  hamBtn.className='ham';
+  hamBtn.innerHTML='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>';
+  hamBtn.addEventListener('click',e=>{e.stopPropagation();sb.classList.contains('open')?closeSidebar():openSidebar();});
+
+  const tbLeft=div('logo-area',[div('logo-svg-wrap',null,{html:LOGO_SVG}),div('logo-div'),span('logo-app','Estoque')]);
+  const tbRight=span('topbar-date',new Date().toLocaleDateString('pt-BR',{weekday:'short',day:'numeric',month:'short'}));
+  const tb=div('topbar',[hamBtn,tbLeft,tbRight]);
+
   const menus=[
     {s:'Geral',items:[{id:'dashboard',lb:'📊 Dashboard'}]},
     {s:'Cardápio & Custos',items:[
@@ -290,13 +334,14 @@ function buildShell(){
     m.items.forEach(it=>{
       const ni=div('ni'+(it.id===PAGE?' active':''),[it.lb]);
       ni.dataset.page=it.id;
-      ni.addEventListener('click',()=>nav(it.id));
+      ni.addEventListener('click',()=>{closeSidebar();nav(it.id);});
       sb.appendChild(ni);
     });
   });
   app.appendChild(tb);
   app.appendChild(div('app-body',[sb,el('main','main',null,{id:'main'})]));
 }
+
 
 const TITLES={dashboard:'Dashboard',insumos:'Insumos',preproducoes:'Pré-produções',fichas:'Fichas Técnicas',contagem:'Contagem de Estoque',saidas:'Saída de Estoque',fornecedores:'Fornecedores',pedidos:'Pedidos à Central'};
 const SUBS={dashboard:'Visão geral das operações',insumos:'Ingredientes e matérias-primas com custo real',preproducoes:'Fichas técnicas dos preparos da cozinha',fichas:'Composição e custo dos pratos do cardápio',contagem:'Registro de estoque do CCMQ e Mac',saidas:'Registro de saídas de insumos do estoque',fornecedores:'Cadastro e gestão de fornecedores',pedidos:'Pedidos entre unidades e Cozinha Central'};
@@ -2868,6 +2913,9 @@ async function modalNovoPedido(){
   });
 
   let _respPed='';
+  let _obsPed='';
+  const obsInpPed=finp('',_obsPed,v=>{_obsPed=v;},'text');
+  obsInpPed.placeholder='Observações opcionais...';
   const inpRespPed=el('input','fi',null,{type:'text',placeholder:'Seu nome (obrigatório)'});
   inpRespPed.addEventListener('input',e=>{
     _respPed=e.target.value;
@@ -2885,7 +2933,7 @@ async function modalNovoPedido(){
     itensWrap,
     addItemWrap,
     totalEl,
-    fgrp('Observações',finp('','',v=>{},'text')),
+    fgrp('Observações',obsInpPed),
     el('hr','dv'),
     (()=>{
       const w=div('fl_ aic gap2');
@@ -2904,7 +2952,7 @@ async function modalNovoPedido(){
     const itensFiltrados=itens.filter(i=>parseFloat(i.quantidade)>0);
     if(!itensFiltrados.length){alert('Adicione pelo menos um item com quantidade.');throw new Error('sem itens');}
     const total=itensFiltrados.reduce((t,i)=>t+(parseFloat(i.quantidade)||0)*parseFloat(i.preco),0);
-    const obs=document.querySelector('.mf')?.previousSibling?.querySelector('input')?.value||'';
+    const obs=_obsPed||'';
     const [ped]=await db('lola_pedidos','POST',{
       unidade:destino,
       destinatario:destino==='terceiro'?destinatario:null,
@@ -3590,9 +3638,12 @@ function mkModal(title,content,onSave,cls){
     mf.appendChild(sb);
   }
   mo.appendChild(mf);
-  ov.appendChild(mo);ov.addEventListener('click',e=>{
-    // Só fecha se clicar exatamente no overlay, nunca em filhos (selects, dropdowns)
-    if(e.target===ov&&!mo.contains(e.target))ov.remove();
+  // Impedir que clicks dentro do modal propaguem para o overlay
+  mo.addEventListener('click',e=>e.stopPropagation());
+  ov.appendChild(mo);
+  ov.addEventListener('click',e=>{
+    // Só fecha se clicar exatamente no fundo escuro
+    if(e.target===ov)ov.remove();
   });
   document.body.appendChild(ov);
 }
