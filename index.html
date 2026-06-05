@@ -1214,9 +1214,45 @@ async function modalPrep(item){
 ══════════════════════════════════ */
 let _ftTab='ccmq',_ftBusca='';
 
+
+function editarDestinos(ficha, onSave){
+  const DESTS=[
+    {k:'ccmq',label:'CCMQ',cor:'#AA2B2B'},
+    {k:'mac',label:'MAC',cor:'#166534'},
+    {k:'eventos',label:'Eventos',cor:'#c47700'},
+  ];
+  const selecionados=new Set(ficha.destinos||[]);
+  const btns=div('fl_ gap2 mt2');
+  DESTS.forEach(d=>{
+    const b=document.createElement('button');
+    b.type='button';
+    function render(){
+      const sel=selecionados.has(d.k);
+      b.style.cssText='padding:8px 16px;border-radius:50px;border:2px solid '+d.cor+';cursor:pointer;font-family:Nunito,sans-serif;font-size:13px;font-weight:700;transition:all .15s;'+(sel?'background:'+d.cor+';color:#fff':'background:#fff;color:'+d.cor);
+      b.textContent=(sel?'✓ ':'')+d.label;
+    }
+    render();
+    b.addEventListener('click',()=>{
+      selecionados.has(d.k)?selecionados.delete(d.k):selecionados.add(d.k);
+      render();
+    });
+    btns.appendChild(b);
+  });
+  mkModal('🏷️ Destinos de '+ficha.nome,[
+    div('tss mb2','Selecione onde esta ficha é utilizada:'),
+    btns,
+  ],async()=>{
+    await db('lola_fichas_tecnicas','PATCH',{destinos:[...selecionados]},'?id=eq.'+ficha.id);
+    ficha.destinos=[...selecionados];
+    onSave&&onSave();
+  });
+}
+
 function drawFT(w){
   w.innerHTML='';
-  let f=_ft.filter(x=>x.cardapio===_ftTab);
+  let f=_ftTab==='todos'?[..._ft]:
+    _ftTab==='pre'?_ft.filter(x=>x.categoria==='pre'||x.cardapio==='pre'||x.categoria==='pré-produção'):
+    _ft.filter(x=>x.cardapio===_ftTab);
   if(_ftBusca) f=f.filter(x=>x.nome.toLowerCase().includes(_ftBusca.toLowerCase()));
   // Alertas de distorção
   const alertas=f.filter(x=>{
@@ -1235,9 +1271,9 @@ function drawFT(w){
     });
     w.appendChild(alertBox);
   }
-  if(!f.length){w.appendChild(em('🍽️',_ftBusca?'Nenhuma ficha encontrada para "'+_ftBusca+'"':'Nenhuma ficha para '+UL[_ftTab]));return;}
+  if(!f.length){w.appendChild(em('🍽️',_ftBusca?'Nenhuma ficha encontrada para "'+_ftBusca+'"':'Nenhuma ficha para '+(_ftTab==='todos'?'esta busca':_ftTab==='pre'?'Pré-produções':(UL[_ftTab]||_ftTab))));return;}
   w.appendChild(div('tw',mkTable(
-    ['Prato','Categoria','Rendimento','Custo/porção','Preço venda','Margem','Última edição',''],
+    ['Prato','Destinos','Custo/porção','Preço venda','Margem','Última edição',''],
     f.map(x=>{
       const semPreco=!x.preco_venda||x.preco_venda<=0;
       const mg=semPreco?null:((x.preco_venda-x.custo_por_porcao)/x.preco_venda*100);
@@ -1256,7 +1292,8 @@ function drawFT(w){
         mkMargem(x.preco_venda,x.custo_por_porcao),
         edInfo2,
         div('fl_ gap2',[
-          btn('btn bg bsm','📋 Ver',()=>verFichaFT(x)),
+          btn('btn bg bsm','📋',()=>verFichaFT(x)),
+          btn('btn bg bsm','🏷️',()=>editarDestinos(x,()=>drawFT($('#ft-t')))),
           btn('btn bg bsm','✏️',()=>modalFicha(x)),
           btn('btn bd bsm','🗑',async()=>{
             if(!confirm('Excluir "'+x.nome+'"? Esta ação não pode ser desfeita.'))return;
@@ -1267,7 +1304,7 @@ function drawFT(w){
         ])
       ],style:rowStyle};
     }),
-    [null,null,null,'tr','tr',null,null,null],
+    [null,null,'tr','tr',null,null,null],
     true
   )));
 }
