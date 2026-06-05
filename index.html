@@ -966,7 +966,7 @@ function drawPP(w){
   const DEST_LBL={ccmq:'CCMQ',mac:'MAC',central:'Central',eventos:'Evento'};
 
   w.appendChild(div('tw',mkTable(
-    ['Nome','Rende','Porcao','Custo total','Custo/porcao','Venda central','Ultima edicao',''],
+    ['Nome','Rende','Custo total','Custo/porcao','Venda central','Ultima edicao',''],
     f.map(p=>{
       const dataEd=p.editado_em?new Date(p.editado_em).toLocaleDateString('pt-BR'):'-';
       const edInfo=div(null,[
@@ -1000,7 +1000,6 @@ function drawPP(w){
       return[
         nomeCell,
         N(p.rendimento_qtd,0)+' '+(p.rendimento_un||''),
-        p.porcao_qtd?N(p.porcao_qtd,0)+' '+(p.porcao_un||''):'—',
         el('span','bold tv',R(p.custo_total)),
         el('span','bold',R(p.custo_por_unidade)),
         p.valor_venda_central?el('span','bold',R(p.valor_venda_central)):span('tss','—'),
@@ -1019,7 +1018,7 @@ function drawPP(w){
         })()
       ];
     }),
-    [null,null,null,'tr','tr','tr',null,null],
+    [null,null,'tr','tr','tr',null,null],
     true
   )));
 }
@@ -1097,14 +1096,14 @@ async function modalPrep(item){
     const unBase=f.rendimento_un==='g'?'kg':f.rendimento_un==='ml'?'L':f.rendimento_un;
     f.custo_por_unidade=(['g','ml'].includes(f.rendimento_un))?(ct/qtd)*1000:ct/qtd;
     const m=parseFloat(f.margem_venda)||70;
-    f.valor_venda_central=f.custo_por_unidade*(1+(m/100));
+    f.valor_venda_central=f.custo_por_unidade/(m/100);
     const numPorcoes2=parseFloat(f.porcao_qtd)>0?(parseFloat(f.rendimento_qtd)/parseFloat(f.porcao_qtd)):null;
     const custoPorcao2=numPorcoes2?ct/numPorcoes2:null;
     custoResEl.innerHTML='<div class="fl_ jb mb3"><span>Custo total</span><strong>'+R(ct)+'</strong></div>'+
       '<div class="fl_ jb mb3"><span>Rendimento total</span><strong>'+N(qtd,0)+' '+f.rendimento_un+'</strong></div>'+
       (numPorcoes2?'<div class="fl_ jb mb3"><span>Porções ('+N(f.porcao_qtd,0)+' '+f.porcao_un+')</span><strong>'+numPorcoes2.toFixed(1)+'</strong></div>':'')+
       (custoPorcao2?'<div class="fl_ jb mb3"><span>Custo/porção</span><strong class="tv">'+R(custoPorcao2)+'</strong></div>':'')+'<div class="fl_ jb mb3"><span>Custo/'+unBase+'</span><strong class="tv">'+R(f.custo_por_unidade)+'</strong></div>'+
-      '<div class="fl_ jb"><span>Valor venda central (+'+m+'%)</span><strong>'+R(f.valor_venda_central)+'</strong></div>';
+      '<div class="fl_ jb"><span>Valor venda central ('+m+'% CMV)</span><strong>'+R(f.valor_venda_central)+'</strong></div>';
   }
 
   // Lista unificada: insumos + sub-pré-prods em ordem alfabética
@@ -1491,7 +1490,39 @@ async function verFichaFT(ft){
   fichaTable(itens,ft.rendimento_qtd,ft.rendimento_un,ft.custo_total,ft.custo_por_porcao,'📋 '+ft.nome,hist);
 }
 
+
+function mkDestinosSelector(destinos, tipo){
+  const DESTS_FT=[
+    {k:'ccmq',label:'CCMQ',cor:'#AA2B2B'},
+    {k:'mac',label:'MAC',cor:'#166534'},
+    {k:'eventos',label:'Eventos',cor:'#c47700'},
+  ];
+  const DESTS_PP=[
+    {k:'ccmq',label:'CCMQ',cor:'#AA2B2B'},
+    {k:'mac',label:'MAC',cor:'#166534'},
+    {k:'central',label:'Central',cor:'#1d4ed8'},
+    {k:'eventos',label:'Eventos',cor:'#c47700'},
+  ];
+  const dests=tipo==='pp'?DESTS_PP:DESTS_FT;
+  const selecionados=new Set(destinos||[]);
+  const wrap=div(null,null,{style:'display:flex;gap:8px;flex-wrap:wrap;margin-top:4px'});
+  dests.forEach(d=>{
+    const b=document.createElement('button');b.type='button';
+    function render(){
+      const sel=selecionados.has(d.k);
+      b.style.cssText='padding:6px 14px;border-radius:50px;border:2px solid '+d.cor+';cursor:pointer;font-family:Nunito,sans-serif;font-size:12px;font-weight:700;transition:all .15s;'+(sel?'background:'+d.cor+';color:#fff':'background:#fff;color:'+d.cor);
+      b.textContent=(sel?'✓ ':'')+d.label;
+    }
+    render();
+    b.addEventListener('click',()=>{selecionados.has(d.k)?selecionados.delete(d.k):selecionados.add(d.k);render();});
+    wrap.appendChild(b);
+  });
+  wrap.getDestinos=()=>[...selecionados];
+  return wrap;
+}
+
 async function modalFicha(item){
+  try{
   const ed=!!item;
   let f={nome:item?.nome||'',cardapio:item?.cardapio||_ftTab,categoria:item?.categoria||'prato',rendimento_qtd:item?.rendimento_qtd||1,rendimento_un:item?.rendimento_un||'porção',preco_venda:item?.preco_venda||''};
   // Custo fixo do banco — não zera ao editar preço de venda
@@ -1726,6 +1757,7 @@ async function modalFicha(item){
     _ft=await db('lola_fichas_tecnicas','GET',null,'?select=*&ativo=eq.true&order=nome.asc');
     drawFT($('#ft-t'));
   },'mo moxl');
+  }catch(e){alert('Erro ao abrir ficha: '+e.message);console.error(e);}
 }
 
 /* ══════════════════════════════════
@@ -3210,7 +3242,7 @@ async function modalNovoPedido(){
         const porcaoUn=x.porcao_un||'';
         if(porcaoQtd>0&&porcaoUn&&porcaoUn!==ru){
           const numP=(parseFloat(x.rendimento_qtd)||1)/porcaoQtd;
-          return (parseFloat(x.custo_total||0)/numP)*(1+(parseFloat(x.margem_venda||70)/100));
+          return (parseFloat(x.custo_total||0)/numP)/(parseFloat(x.margem_venda||70)/100);
         }
         return parseFloat(x.valor_venda_central)||0;
       },
@@ -3440,7 +3472,7 @@ async function editarPedido(ped){
              const rendQtd=parseFloat(x.rendimento_qtd)||1;
              const numPorcoes=rendQtd/porcaoQtd;
              const custoPorcao=parseFloat(x.custo_total||0)/numPorcoes;
-             const vendaPorcao=custoPorcao*(1+(parseFloat(x.margem_venda||70)/100));
+             const vendaPorcao=custoPorcao/(1-(parseFloat(x.margem_venda||70)/100));
              const unLabel=porcaoUn==='un'?'porção':porcaoUn;
              return {nome:x.nome,unidade:unLabel,preco:vendaPorcao,tipo:'prep',cat:x.categoria,
                      info:'('+porcaoQtd+ru+'/porção — '+numPorcoes.toFixed(1)+' porções)'};
