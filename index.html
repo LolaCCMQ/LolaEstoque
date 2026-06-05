@@ -1705,7 +1705,7 @@ async function modalGerenciarItens(categoria, onSave){
   mo.appendChild(mb2);
   mo.appendChild(div('mf',[btn('btn bg','Fechar',()=>{ov.remove();onSave&&onSave();})]));
   ov.appendChild(mo);
-  ov.addEventListener('click',e=>{if(e.target===ov){ov.remove();onSave&&onSave();}});
+  ov.addEventListener('click',e=>{if(e.target===ov&&!mo.contains(e.target))ov.remove();});
   document.body.appendChild(ov);
   rebuild();
 }
