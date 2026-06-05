@@ -958,7 +958,7 @@ function editarDestinosPP(pp, onSave){
 
 function drawPP(w){
   w.innerHTML='';
-  let f=_ppTab==='todos'?[..._pp]:_ppTab==='pre'?_pp.filter(p=>p.categoria==='pre'||p.categoria==='central'):_pp.filter(p=>p.categoria===_ppTab);
+  let f=_ppTab==='todos'?[..._pp]:_ppTab==='pre'?_pp.filter(p=>p.e_preparo):_pp.filter(p=>p.categoria===_ppTab);
   if(_ppBusca) f=f.filter(p=>p.nome.toLowerCase().includes(_ppBusca.toLowerCase()));
   if(!f.length){w.appendChild(em('pp',_ppBusca?'Nenhuma pre-producao encontrada':'Nenhuma para esta aba'));return;}
 
@@ -989,7 +989,13 @@ function drawPP(w){
         s.textContent=DEST_LBL[d]||d;
         selosRow.appendChild(s);
       });
-      if((p.destinos||[]).length) nomeCell.appendChild(selosRow);
+      if(p.e_preparo){
+        const s=document.createElement('span');
+        s.style.cssText='font-size:10px;font-weight:800;padding:2px 8px;border-radius:50px;color:#fff;background:#7c3aed';
+        s.textContent='🔄 Pré-preparo';
+        selosRow.appendChild(s);
+      }
+      if((p.destinos||[]).length||p.e_preparo) nomeCell.appendChild(selosRow);
 
       return[
         nomeCell,
@@ -1002,7 +1008,6 @@ function drawPP(w){
         (()=>{
           const wrap=div('fl_ gap2');
           wrap.appendChild(btn('btn bg bsm','📋',()=>verFichaPrep(p)));
-          wrap.appendChild(btn('btn bg bsm','🏷️',()=>editarDestinosPP(p,()=>drawPP($('#pp-t')))));
           wrap.appendChild(btn('btn bg bsm','✏️',()=>modalPrep(p)));
           wrap.appendChild(btn('btn bd bsm','🗑',async()=>{
             if(!confirm('Excluir "'+p.nome+'"?'))return;
@@ -1208,12 +1213,46 @@ async function modalPrep(item){
   const _autorPP={v:item?.editado_por||''};
   const nomeEdit=finp('',_autorPP.v,v=>{_autorPP.v=v;});
   nomeEdit.placeholder='Seu nome...';
+  // Seletor de destinos PP
+  const DESTS_PP_OPT=[
+    {k:'ccmq',label:'CCMQ',cor:'#AA2B2B'},
+    {k:'mac',label:'MAC',cor:'#166634'},
+    {k:'central',label:'Central',cor:'#1d4ed8'},
+    {k:'eventos',label:'Eventos',cor:'#c47700'},
+  ];
+  const _selDestsPP=new Set(item?.destinos||[]);
+  const destBtnsWrap=div(null,null,{style:'display:flex;gap:8px;flex-wrap:wrap;margin-top:4px'});
+  DESTS_PP_OPT.forEach(d=>{
+    const b=document.createElement('button');b.type='button';
+    function renderB(){
+      const sel=_selDestsPP.has(d.k);
+      b.style.cssText='padding:6px 14px;border-radius:50px;border:2px solid '+d.cor+';cursor:pointer;font-family:Nunito,sans-serif;font-size:12px;font-weight:700;'+(sel?'background:'+d.cor+';color:#fff':'background:#fff;color:'+d.cor);
+      b.textContent=(sel?'✓ ':'')+d.label;
+    }
+    renderB();
+    b.addEventListener('click',()=>{_selDestsPP.has(d.k)?_selDestsPP.delete(d.k):_selDestsPP.add(d.k);renderB();});
+    destBtnsWrap.appendChild(b);
+  });
+
+  // Checkbox pré-preparo
+  let _isPre=!!(item?.e_preparo);
+  const preChkWrap=document.createElement('label');
+  preChkWrap.style.cssText='display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;font-weight:700;padding:10px 14px;background:var(--rt);border-radius:10px;border:1.5px solid var(--rb);margin-top:0';
+  const chkInp=document.createElement('input');chkInp.type='checkbox';chkInp.checked=_isPre;
+  chkInp.style.cssText='width:18px;height:18px;accent-color:var(--v);cursor:pointer;flex-shrink:0';
+  chkInp.addEventListener('change',e=>_isPre=e.target.checked);
+  const chkLbl=document.createElement('div');
+  chkLbl.innerHTML='<strong>🔄 Pré-preparo</strong><div style="font-size:11px;font-weight:400;color:var(--ts)">Ingrediente usado dentro de outras produções</div>';
+  preChkWrap.appendChild(chkInp);preChkWrap.appendChild(chkLbl);
+
   mkModal((ed?'Editar':'Nova')+' pré-produção',[
     div('fg3',[
       fgrp('Nome',finp('',f.nome,v=>f.nome=v)),
       fgrp('Categoria',fsel('',['central','mac','ccmq'],f.categoria,v=>f.categoria=v)),
       fgrp('✍️ Editado por',nomeEdit),
     ]),
+    fgrp('🏷️ Onde é utilizado',destBtnsWrap),
+    preChkWrap,
     div('fg2',[
       fgrp('Rendimento total',finp('',f.rendimento_qtd,v=>{f.rendimento_qtd=v;calcTotais();},'number')),
       fgrp('Unidade',fsel('',['g','ml','kg','L','un','porção'],f.rendimento_un,v=>{f.rendimento_un=v;calcTotais();})),
@@ -1241,7 +1280,7 @@ async function modalPrep(item){
     const qtd=parseFloat(f.rendimento_qtd)||1;
     f.custo_por_unidade=(['g','ml'].includes(f.rendimento_un))?(f.custo_total/qtd)*1000:f.custo_total/qtd;
     if(!f.valor_venda_central||f.valor_venda_central===0)f.valor_venda_central=f.custo_por_unidade*1.7;
-    const p={nome:f.nome,categoria:f.categoria,rendimento_qtd:parseFloat(f.rendimento_qtd),rendimento_un:f.rendimento_un,porcao_qtd:parseFloat(f.porcao_qtd)||null,porcao_un:f.porcao_un||null,custo_total:f.custo_total,custo_por_unidade:f.custo_por_unidade,valor_venda_central:parseFloat(f.valor_venda_central),margem_venda:parseFloat(f.margem_venda)||70,editado_por:_autorPP.v||null,editado_em:new Date().toISOString()};
+    const p={nome:f.nome,categoria:f.categoria,destinos:[..._selDestsPP],e_preparo:_isPre,rendimento_qtd:parseFloat(f.rendimento_qtd),rendimento_un:f.rendimento_un,porcao_qtd:parseFloat(f.porcao_qtd)||null,porcao_un:f.porcao_un||null,custo_total:f.custo_total,custo_por_unidade:f.custo_por_unidade,valor_venda_central:parseFloat(f.valor_venda_central),margem_venda:parseFloat(f.margem_venda)||70,editado_por:_autorPP.v||null,editado_em:new Date().toISOString()};
     let pid;
     if(ed){await db('lola_preproducoes','PATCH',p,'?id=eq.'+item.id);await db('lola_preproducoes_itens','DELETE',null,'?preproducao_id=eq.'+item.id);pid=item.id;}
     else{const[nv]=await db('lola_preproducoes','POST',p);pid=nv.id;}
@@ -1365,7 +1404,6 @@ function drawFT(w){
         (()=>{
           const wrap=div('fl_ gap2');
           wrap.appendChild(btn('btn bg bsm','📋',()=>verFichaFT(x)));
-          wrap.appendChild(btn('btn bg bsm','🏷️',()=>editarDestinos(x,()=>drawFT($('#ft-t')))));
           wrap.appendChild(btn('btn bg bsm','✏️',()=>modalFicha(x)));
           const del=btn('btn bd bsm','🗑',async()=>{
             if(!confirm('Excluir '+x.nome+'?'))return;
