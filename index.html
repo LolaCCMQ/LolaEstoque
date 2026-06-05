@@ -465,6 +465,7 @@ function mkInsTable(itens){
         el('span','bold tv',R(i.custo_por_unidade)+' / '+unCusto),
         div('fl_ gap2',[
           btn('btn bg bsm','🔍',()=>ondeEUsado(i)),
+          btn('btn bg bsm','📈',()=>verHistoricoPreco(i)),
           btn('btn bg bsm','✏️',()=>modalIns(i)),
           btn('btn bd bsm','🗑',()=>delIns(i.id)),
         ])
@@ -670,6 +671,178 @@ function modalIns(item){
     _ins=await db('lola_insumos','GET',null,'?select=*&ativo=eq.true&order=categoria.asc,nome.asc');
     window._drawIns&&window._drawIns($('#ins-t'));
   });
+}
+
+
+async function verHistoricoPreco(ins){
+  const ov=div('ov');const mo=div('mo mol');
+  mo.appendChild(div('mh',[
+    el('h3',null,'📈 Histórico de preços — '+ins.nome),
+    btn('xb','✕',()=>ov.remove())
+  ]));
+  const mb=div('mb');mb.appendChild(ld());
+  mo.appendChild(mb);
+  ov.appendChild(mo);
+  mo.addEventListener('click',e=>e.stopPropagation());
+  ov.addEventListener('click',e=>{if(e.target===ov)ov.remove();});
+  document.body.appendChild(ov);
+
+  try{
+    const hist=await db('lola_insumos_historico','GET',null,
+      '?insumo_id=eq.'+ins.id+'&order=editado_em.asc&select=*');
+
+    mb.innerHTML='';
+
+    const unCusto=ins.unidade_custo||'kg';
+
+    // Card resumo atual
+    mb.appendChild(div('g3 mb3',[
+      div('custo-box',[span('scl','Preço atual'),div('bold tv mt2',R(ins.custo_por_unidade)+'/'+unCusto)]),
+      div('custo-box',[span('scl','Atualizações'),div('bold mt2',hist.length+' registro'+(hist.length!==1?'s':''))]),
+      div('custo-box',[span('scl','Primeira vez'),div('bold mt2',hist.length?new Date(hist[0].editado_em).toLocaleDateString('pt-BR',{month:'short',year:'2-digit'}):'—')]),
+    ]));
+
+    if(!hist.length){
+      mb.appendChild(div('tss mt3 tc','Nenhum histórico de alteração registrado ainda. Os preços serão registrados automaticamente a cada atualização mensal.'));
+      mo.appendChild(div('mf',[btn('btn bg','Fechar',()=>ov.remove())]));
+      return;
+    }
+
+    // Montar dados com ponto atual
+    const dados=[...hist.map(h=>({
+      data:new Date(h.editado_em),
+      preco:parseFloat(h.custo_por_unidade_novo||h.custo_novo||0),
+      editor:h.editado_por||'',
+    })),{data:new Date(),preco:parseFloat(ins.custo_por_unidade),editor:'atual'}];
+
+    // Calcular variação
+    if(dados.length>=2){
+      const primeiro=dados[0].preco;
+      const ultimo=dados[dados.length-1].preco;
+      const var_pct=((ultimo-primeiro)/primeiro*100).toFixed(1);
+      const cor=var_pct>0?'#dc2626':var_pct<0?'#166534':'var(--ts)';
+      const seta=var_pct>0?'↑':var_pct<0?'↓':'→';
+      const varEl=div('al ali mb3');
+      varEl.style.cssText='padding:10px 16px;border-radius:10px;background:'+(var_pct>0?'#fee2e2':var_pct<0?'#dcfce7':'var(--rf)');
+      varEl.innerHTML='<span style="font-weight:700;color:'+cor+'">'+seta+' '+Math.abs(var_pct)+'% desde o início</span> <span style="font-size:12px;color:var(--ts)">· de '+R(primeiro)+' para '+R(ultimo)+'/'+unCusto+'</span>';
+      mb.appendChild(varEl);
+    }
+
+    // Gráfico SVG simples
+    const precos=dados.map(d=>d.preco);
+    const minP=Math.min(...precos)*0.9;
+    const maxP=Math.max(...precos)*1.1||1;
+    const W=480,H=160,PAD=40;
+    const iW=W-PAD*2,iH=H-PAD;
+
+    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+    svg.setAttribute('viewBox','0 0 '+W+' '+H);
+    svg.style.cssText='width:100%;height:auto;display:block;margin-bottom:16px';
+
+    // Linhas de grade
+    [0,0.25,0.5,0.75,1].forEach(p=>{
+      const y=PAD/2+iH*(1-p);
+      const line=document.createElementNS('http://www.w3.org/2000/svg','line');
+      line.setAttribute('x1',PAD);line.setAttribute('x2',W-PAD);
+      line.setAttribute('y1',y);line.setAttribute('y2',y);
+      line.setAttribute('stroke','#f0e0e0');line.setAttribute('stroke-width','1');
+      svg.appendChild(line);
+      const val=minP+(maxP-minP)*p;
+      const txt=document.createElementNS('http://www.w3.org/2000/svg','text');
+      txt.setAttribute('x',PAD-4);txt.setAttribute('y',y+4);
+      txt.setAttribute('text-anchor','end');txt.setAttribute('font-size','9');
+      txt.setAttribute('fill','#999');txt.textContent='R$'+val.toFixed(0);
+      svg.appendChild(txt);
+    });
+
+    // Pontos e linha
+    const pts=dados.map((d,i)=>{
+      const x=PAD+iW*(i/(dados.length-1||1));
+      const y=PAD/2+iH*(1-(d.preco-minP)/(maxP-minP||1));
+      return {x,y,d};
+    });
+
+    // Linha
+    if(pts.length>1){
+      const path=document.createElementNS('http://www.w3.org/2000/svg','polyline');
+      path.setAttribute('points',pts.map(p=>p.x+','+p.y).join(' '));
+      path.setAttribute('fill','none');path.setAttribute('stroke','#AA2B2B');
+      path.setAttribute('stroke-width','2.5');path.setAttribute('stroke-linejoin','round');
+      svg.appendChild(path);
+      // Área
+      const area=document.createElementNS('http://www.w3.org/2000/svg','polygon');
+      const areaPoints=[...pts.map(p=>p.x+','+p.y),
+        (W-PAD)+','+(PAD/2+iH), PAD+','+(PAD/2+iH)].join(' ');
+      area.setAttribute('points',areaPoints);
+      area.setAttribute('fill','rgba(170,43,43,0.08)');
+      svg.appendChild(area);
+    }
+
+    // Pontos e labels
+    pts.forEach((pt,i)=>{
+      const circle=document.createElementNS('http://www.w3.org/2000/svg','circle');
+      circle.setAttribute('cx',pt.x);circle.setAttribute('cy',pt.y);
+      circle.setAttribute('r','4');circle.setAttribute('fill','#AA2B2B');
+      svg.appendChild(circle);
+      // Label de preço
+      const txt=document.createElementNS('http://www.w3.org/2000/svg','text');
+      txt.setAttribute('x',pt.x);txt.setAttribute('y',pt.y-8);
+      txt.setAttribute('text-anchor','middle');txt.setAttribute('font-size','9');
+      txt.setAttribute('fill','#AA2B2B');txt.setAttribute('font-weight','bold');
+      txt.textContent='R$'+pt.d.preco.toFixed(2);
+      svg.appendChild(txt);
+      // Label de data
+      if(i===0||i===pts.length-1||pts.length<=6){
+        const dtxt=document.createElementNS('http://www.w3.org/2000/svg','text');
+        dtxt.setAttribute('x',pt.x);dtxt.setAttribute('y',H-4);
+        dtxt.setAttribute('text-anchor','middle');dtxt.setAttribute('font-size','8');
+        dtxt.setAttribute('fill','#999');
+        dtxt.textContent=pt.d.editor==='atual'?'hoje':pt.d.data.toLocaleDateString('pt-BR',{month:'short',year:'2-digit'});
+        svg.appendChild(dtxt);
+      }
+    });
+
+    const svgWrap=div('custo-box mb3');svgWrap.appendChild(svg);
+    mb.appendChild(svgWrap);
+
+    // Tabela de histórico
+    mb.appendChild(el('strong',null,'Histórico detalhado',{style:'font-size:12px;display:block;margin-bottom:8px'}));
+    const tblWrap=div('tw');
+    const tbl=document.createElement('table');tbl.style.cssText='width:100%;border-collapse:collapse';
+    const thead=document.createElement('thead');const htr=document.createElement('tr');
+    ['Data','Preço anterior','Novo preço','Variação','Editado por'].forEach((h,i)=>{
+      const th=document.createElement('th');
+      th.style.cssText='padding:6px 10px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--v);background:var(--rt);text-align:'+(i>=1&&i<=3?'right':'left');
+      th.textContent=h;htr.appendChild(th);
+    });
+    thead.appendChild(htr);tbl.appendChild(thead);
+    const tbody=document.createElement('tbody');
+    hist.forEach((h,i)=>{
+      const tr=document.createElement('tr');
+      tr.style.cssText=(i%2===0?'background:var(--rf)':'background:#fff')+';border-bottom:1px solid var(--rb)';
+      const novoP=parseFloat(h.custo_por_unidade_novo||h.custo_novo||0);
+      const anteP=parseFloat(h.custo_por_unidade_anterior||h.custo_anterior||0);
+      const vPct=anteP>0?((novoP-anteP)/anteP*100).toFixed(1):null;
+      const cor=vPct>0?'#dc2626':vPct<0?'#166534':'var(--ts)';
+      [
+        new Date(h.editado_em).toLocaleDateString('pt-BR',{day:'2-digit',month:'short',year:'2-digit'}),
+        R(anteP)+'/'+unCusto,
+        R(novoP)+'/'+unCusto,
+        vPct!==null?(vPct>0?'↑ +':vPct<0?'↓ ':'→ ')+Math.abs(vPct)+'%':'—',
+        h.editado_por||'—',
+      ].forEach((val,ci)=>{
+        const td=document.createElement('td');
+        td.style.cssText='padding:7px 10px;font-size:12px;text-align:'+(ci>=1&&ci<=3?'right':'left')+(ci===3?';font-weight:700;color:'+cor:'');
+        td.textContent=val;tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    tbl.appendChild(tbody);tblWrap.appendChild(tbl);
+    mb.appendChild(tblWrap);
+
+  }catch(e){mb.innerHTML='<p style="color:red;padding:20px">'+e.message+'</p>';}
+
+  mo.appendChild(div('mf',[btn('btn bg','Fechar',()=>ov.remove())]));
 }
 
 function modalPrecos(){
@@ -2352,26 +2525,45 @@ async function modalNovaContagem(c){
     const secT=document.createElement('div');
     secT.style.cssText='font-size:13px;font-weight:700;color:var(--ts);margin:16px 0 8px;padding-bottom:4px;border-bottom:1.5px solid var(--rb)';
     secT.textContent=label;form.appendChild(secT);
-    const tbl=document.createElement('table');tbl.style.cssText='width:100%;border-collapse:collapse;margin-bottom:8px';
-    const thead=document.createElement('thead');const hRow=document.createElement('tr');
-    ['Produto','Un','Mín.','Qtd contada','Pedido'].forEach((h,i)=>{
-      const th=document.createElement('th');th.style.cssText='padding:6px 8px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--v);background:var(--rt);text-align:'+(i>=2?'right':'left');th.textContent=h;hRow.appendChild(th);
+    const tbl=document.createElement('div');tbl.style.cssText='margin-bottom:8px';
+    // Header só no desktop (tabela); no mobile usa cards
+    const thead=document.createElement('div');
+    thead.className='cont-thead';
+    thead.style.cssText='display:grid;grid-template-columns:1fr 50px 60px 90px 80px;gap:4px;padding:5px 8px;background:var(--rt);border-radius:8px;margin-bottom:4px';
+    ['Produto','Un','Mín.','Contado','Pedido'].forEach((h,i)=>{
+      const th=document.createElement('div');
+      th.style.cssText='font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--v);text-align:'+(i>=2?'right':'left');
+      th.textContent=h;thead.appendChild(th);
     });
-    thead.appendChild(hRow);tbl.appendChild(thead);
-    const tbody=document.createElement('tbody');
+    tbl.appendChild(thead);
     catItens.forEach((it,idx)=>{
-      const tr=document.createElement('tr');tr.style.cssText=(idx%2===0?'background:var(--rf)':'background:#fff')+';border-bottom:1px solid var(--rb)';
-      const tdN=document.createElement('td');tdN.style.cssText='padding:8px;font-size:12px;font-weight:600';tdN.textContent=it.nome;tr.appendChild(tdN);
-      const tdU=document.createElement('td');tdU.style.cssText='padding:8px;font-size:12px;text-align:right;color:var(--ts)';tdU.textContent=it.unidade;tr.appendChild(tdU);
-      const tdM=document.createElement('td');tdM.style.cssText='padding:8px;font-size:12px;text-align:right;color:var(--ts)';tdM.textContent=N(it.qtd_minima,0);tr.appendChild(tdM);
-      const tdQ=document.createElement('td');tdQ.style.cssText='padding:4px 8px;text-align:right';
+      // Card mobile-first: nome + [contado] [pedido] na mesma linha
+      const card=document.createElement('div');
+      card.style.cssText='display:flex;align-items:center;gap:8px;padding:8px;'+(idx%2===0?'background:var(--rf)':'background:#fff')+';border-radius:8px;margin-bottom:3px;border:1px solid var(--rb)';
+
+      // Nome + unidade + mínimo
+      const info=document.createElement('div');
+      info.style.cssText='flex:1;min-width:0';
+      const nome=document.createElement('div');
+      nome.style.cssText='font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+      nome.textContent=it.nome;
+      const meta=document.createElement('div');
+      meta.style.cssText='font-size:10px;color:var(--ts);margin-top:1px';
+      meta.textContent=(it.unidade||'')+(it.qtd_minima?' · mín: '+N(it.qtd_minima,0):'');
+      info.appendChild(nome);info.appendChild(meta);card.appendChild(info);
+
+      // Input Qtd contada
       const inpQ=document.createElement('input');inpQ.type='number';inpQ.step='0.5';inpQ.min='0';
-      inpQ.style.cssText='width:80px;padding:5px 8px;border:1.5px solid var(--rb);border-radius:8px;font-size:13px;text-align:right;font-family:Nunito,sans-serif';
-      inpQ.placeholder='0';
-      const tdP=document.createElement('td');tdP.style.cssText='padding:4px 8px;text-align:right';
+      inpQ.placeholder='Qtd';
+      inpQ.style.cssText='width:72px;padding:8px 6px;border:2px solid var(--rb);border-radius:10px;font-size:14px;text-align:center;font-family:Nunito,sans-serif;font-weight:700;background:#fff;-webkit-appearance:none';
+      inpQ.setAttribute('inputmode','decimal');
+
+      // Input Pedido
       const inpP=document.createElement('input');inpP.type='number';inpP.step='0.5';inpP.min='0';
-      inpP.style.cssText='width:70px;padding:5px 8px;border:1.5px solid var(--rb);border-radius:8px;font-size:12px;text-align:right;font-family:Nunito,sans-serif;color:var(--v)';
-      inpP.placeholder='—';
+      inpP.placeholder='Ped';
+      inpP.style.cssText='width:65px;padding:8px 6px;border:2px solid var(--rb);border-radius:10px;font-size:13px;text-align:center;font-family:Nunito,sans-serif;color:var(--v);font-weight:700;background:#fff;-webkit-appearance:none';
+      inpP.setAttribute('inputmode','decimal');
+
       inpQ.addEventListener('input',e=>{
         qtds[it.id].qtd=e.target.value;
         const contado=parseFloat(e.target.value)||0;const min=parseFloat(it.qtd_minima)||0;
@@ -2380,11 +2572,12 @@ async function modalNovaContagem(c){
         else{inpP.value='';qtds[it.id].pedido='';inpQ.style.borderColor='var(--vd)';}
       });
       inpP.addEventListener('input',e=>qtds[it.id].pedido=e.target.value);
-      tdQ.appendChild(inpQ);tdP.appendChild(inpP);tr.appendChild(tdQ);tr.appendChild(tdP);
-      tbody.appendChild(tr);
+
+      card.appendChild(inpQ);card.appendChild(inpP);
+      tbl.appendChild(card);
     });
-    tbl.appendChild(tbody);form.appendChild(tbl);
-  });
+    form.appendChild(tbl);
+  }); // fecha Object.entries forEach
 
   mkModal('📦 Nova Contagem de Estoque',[form],async()=>{
     const[ct]=await db('lola_contagens','POST',{
@@ -2546,10 +2739,10 @@ function drawPed(w){
         (()=>{
           const wrap=div('fl_ gap2');
           wrap.appendChild(btn('btn bg bsm','📋 Ver',()=>verPedido(p)));
+          wrap.appendChild(btn('btn bg bsm','✏️',()=>editarPedido(p)));
           if(p.status==='rascunho'){
-            wrap.appendChild(btn('btn bg bsm','✏️',()=>editarPedido(p)));
             const envBtn=btn('btn bv bsm','📤 Enviar',async()=>{
-              if(!confirm('Enviar pedido #'+p.numero_pedido+' para a Central? Ele não poderá mais ser editado.'))return;
+              if(!confirm('Enviar pedido #'+p.numero_pedido+' para a Central?'))return;
               await db('lola_pedidos','PATCH',{status:'solicitado'},'?id=eq.'+p.id);
               p.status='solicitado';
               _peds=await db('lola_pedidos','GET',null,'?select=*&order=created_at.desc');
