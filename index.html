@@ -3192,6 +3192,8 @@ async function modalNovoPedido(){
     const insDest=_ins.filter(x=>(x.destinos||[]).includes(_destPed)&&
       (!_buscaNovoPed||x.nome.toLowerCase().includes(_buscaNovoPed)));
 
+    const conteudo=div(null);
+
     if(!ppDest.length&&!insDest.length){
       conteudo.appendChild(div('tss mt3 mb3','Nenhum item categorizado para '+DEST_LBL[_destPed]+' ainda. Use o botão 🏷️ nas pré-produções e insumos para categorizar.'));
       itensArea.appendChild(conteudo);
