@@ -3117,8 +3117,9 @@ async function pgPed(c){
 }
 
 async function modalNovoPedido(){
-  if(!_pp.length)_pp=await db('lola_preproducoes','GET',null,'?select=*&ativo=eq.true&order=nome.asc');
-  if(!_ins.length)_ins=await db('lola_insumos','GET',null,'?select=*&ativo=eq.true&order=nome.asc');
+  // Sempre recarregar para ter destinos atualizados
+  _pp=await db('lola_preproducoes','GET',null,'?select=id,nome,categoria,rendimento_qtd,rendimento_un,porcao_qtd,porcao_un,custo_total,custo_por_unidade,valor_venda_central,margem_venda,destinos,e_preparo&ativo=eq.true&order=nome.asc');
+  _ins=await db('lola_insumos','GET',null,'?select=id,nome,categoria,unidade_compra,unidade_custo,custo_por_unidade,destinos&ativo=eq.true&order=nome.asc');
 
   const DEST_COR={ccmq:'#AA2B2B',mac:'#166534',eventos:'#c47700'};
   const DEST_LBL={ccmq:'CCMQ',mac:'MAC',eventos:'Evento'};
