@@ -3174,15 +3174,26 @@ async function modalNovoPedido(){
   const itensArea=div(null);
   mb.appendChild(itensArea);
 
+  let _buscaNovoPed='';
+
+  // Campo de busca — renderizado uma vez antes de buildItens
+  const buscaInp=el('input','fi',null,{placeholder:'🔍 Buscar item...',autocomplete:'off'});
+  buscaInp.style.cssText='width:100%;margin-bottom:12px';
+  buscaInp.addEventListener('input',e=>{_buscaNovoPed=e.target.value.toLowerCase();buildItens();});
+  mb.appendChild(buscaInp);
+
   function buildItens(){
     itensArea.innerHTML='';
 
     // Filtrar pré-produções e insumos pelo destino selecionado
-    const ppDest=_pp.filter(x=>(x.destinos||[]).includes(_destPed));
-    const insDest=_ins.filter(x=>(x.destinos||[]).includes(_destPed));
+    const ppDest=_pp.filter(x=>(x.destinos||[]).includes(_destPed)&&
+      (!_buscaNovoPed||x.nome.toLowerCase().includes(_buscaNovoPed)));
+    const insDest=_ins.filter(x=>(x.destinos||[]).includes(_destPed)&&
+      (!_buscaNovoPed||x.nome.toLowerCase().includes(_buscaNovoPed)));
 
     if(!ppDest.length&&!insDest.length){
-      itensArea.appendChild(div('tss mt3 mb3','Nenhum item categorizado para '+DEST_LBL[_destPed]+' ainda. Use o botão 🏷️ nas pré-produções e insumos para categorizar.'));
+      conteudo.appendChild(div('tss mt3 mb3','Nenhum item categorizado para '+DEST_LBL[_destPed]+' ainda. Use o botão 🏷️ nas pré-produções e insumos para categorizar.'));
+      itensArea.appendChild(conteudo);
       return;
     }
 
@@ -3231,7 +3242,7 @@ async function modalNovoPedido(){
         row.appendChild(info);row.appendChild(inp);row.appendChild(un);
         g.appendChild(row);
       });
-      itensArea.appendChild(g);
+      conteudo.appendChild(g);
     }
 
     // Grupo pré-produções
@@ -3271,6 +3282,7 @@ async function modalNovoPedido(){
       x=>x.nome
     );
 
+    itensArea.appendChild(conteudo);
     calcTotal();
   }
 
