@@ -3170,17 +3170,17 @@ async function modalNovoPedido(){
 
   mb.appendChild(el('hr','dv'));
 
+  // Campo de busca
+  const buscaInp=el('input','fi',null,{placeholder:'🔍 Buscar item...',autocomplete:'off'});
+  buscaInp.style.cssText='width:100%;margin-bottom:8px';
+  buscaInp.addEventListener('input',e=>{_buscaNovoPed=e.target.value.toLowerCase();buildItens();});
+  mb.appendChild(buscaInp);
+
   // Área de itens
   const itensArea=div(null);
   mb.appendChild(itensArea);
 
   let _buscaNovoPed='';
-
-  // Campo de busca — renderizado uma vez antes de buildItens
-  const buscaInp=el('input','fi',null,{placeholder:'🔍 Buscar item...',autocomplete:'off'});
-  buscaInp.style.cssText='width:100%;margin-bottom:12px';
-  buscaInp.addEventListener('input',e=>{_buscaNovoPed=e.target.value.toLowerCase();buildItens();});
-  mb.appendChild(buscaInp);
 
   function buildItens(){
     itensArea.innerHTML='';
