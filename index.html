@@ -363,12 +363,13 @@ async function renderPage(){
 async function pgDash(c){
   c.appendChild(ld());
   try{
-    const[ai,af,ap,ar,pr]=await Promise.all([
+    const[ai,af,ap,ar,pr,uc]=await Promise.all([
       db('lola_insumos','GET',null,'?select=id&ativo=eq.true'),
       db('lola_fichas_tecnicas','GET',null,'?select=id&ativo=eq.true'),
       db('lola_pedidos','GET',null,'?select=id&status=eq.solicitado'),
       db('lola_preproducoes','GET',null,'?select=id&ativo=eq.true'),
       db('lola_pedidos','GET',null,'?select=*&order=created_at.desc&limit=6'),
+      db('lola_contagens','GET',null,'?order=data_contagem.desc&limit=3'),
     ]);
     c.innerHTML='';
     c.appendChild(div('g3',[
@@ -376,8 +377,23 @@ async function pgDash(c){
       mkStat('🍳','Pré-produções',ar.length,'preparos mapeados'),
       mkStat('🛒','Pedidos solicitados',ap.length,'aguardando Central',ap.length>0?'var(--v)':'var(--vd)'),
     ]));
+    // Últimas contagens
+    if(uc.length){
+      const cardCont=div('card mb3');
+      cardCont.appendChild(div('bold mb3','📦 Últimas contagens',{style:'font-family:Playfair Display,serif;font-size:16px;color:var(--v)'}));
+      cardCont.appendChild(div('g3',uc.map(ct=>{
+        const dataFmt=new Date(ct.data_contagem+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'short'});
+        const s=div('sc');s.style.cursor='pointer';
+        s.appendChild(span('scl',dataFmt));
+        const v=div('scv');v.style.fontSize='14px';v.textContent=ct.responsavel||'—';
+        s.appendChild(v);s.appendChild(span('scs','Ver contagem →'));
+        s.onclick=()=>nav('contagem');
+        return s;
+      })));
+      c.appendChild(cardCont);
+    }
     const card=div('card');
-    card.appendChild(div('bold mb3',['📋 Pedidos recentes'],{style:'font-family:Playfair Display,serif;font-size:16px;color:var(--v)'}));
+    card.appendChild(div('bold mb3','📋 Pedidos recentes',{style:'font-family:Playfair Display,serif;font-size:16px;color:var(--v)'}));
     if(!pr.length)card.appendChild(em('📋','Nenhum pedido ainda'));
     else card.appendChild(div('tw',mkTable(
       ['Nº','Unidade','Data','Status','Total'],
@@ -1037,7 +1053,7 @@ async function pgPreps(c){
     c.innerHTML='';
     _ppBusca='';
     const ppSearchEl=mkSearch(q=>{_ppBusca=q;drawPP($('#pp-t'));},'Buscar pré-produção...');
-    const ppTabsEl=mkTabs(['todos','central','mac','ccmq','eventos','pre'],_ppTab,t=>{_ppTab=t;drawPP($('#pp-t'));},['Tudo','Central','MAC','CCMQ','Eventos','Pré'],true);
+    const ppTabsEl=mkTabs(['todos','central','mac','ccmq','eventos'],_ppTab,t=>{_ppTab=t;drawPP($('#pp-t'));},['Tudo','Central','MAC','CCMQ','Eventos'],true);
     const ppBarEsq=div(null);ppBarEsq.style.cssText='display:flex;align-items:center;gap:8px;flex-wrap:wrap;';
     ppBarEsq.appendChild(ppTabsEl);ppBarEsq.appendChild(ppSearchEl);
     const ppBar=div('abar no-print');
@@ -2180,6 +2196,30 @@ let _fornecedores=[];
    SAÍDA DE ESTOQUE
 ══════════════════════════════════ */
 
+async function modalEditarSaida(saida, onSave){
+  if(!saida)return;
+  const f={data:saida.data_saida,responsavel:saida.responsavel||'',destino:saida.destino||'venda',observacoes:saida.observacoes||''};
+  const destOpts=['venda','evento','descarte','outro'].map(v=>({v,l:({venda:'🛍️ Venda',evento:'🎪 Evento',descarte:'🗑️ Descarte',outro:'📦 Outro'})[v]}));
+  mkModal('✏️ Editar Saída',[
+    div('fg2',[
+      fgrp('Data',el('input','fi',null,{type:'date',value:f.data,oninput:''})),
+      fgrp('Destino',fsel('',destOpts,f.destino,v=>f.destino=v)),
+    ]),
+    fgrp('Responsável',finp('',f.responsavel,v=>f.responsavel=v)),
+    fgrp('Observações',finp('',f.observacoes,v=>f.observacoes=v)),
+  ],async()=>{
+    // Pegar valor atualizado do campo data
+    const inps=document.querySelectorAll('.mo input[type=date]');
+    if(inps.length)f.data=inps[inps.length-1].value;
+    await db('lola_saidas','PATCH',{
+      data_saida:f.data,responsavel:f.responsavel||null,
+      destino:f.destino,observacoes:f.observacoes||null
+    },'?id=eq.'+saida.id);
+    onSave&&onSave();
+  });
+}
+
+
 async function pgSaidas(c){
   c.appendChild(ld());
   try{
@@ -2228,10 +2268,18 @@ async function pgSaidas(c){
 
       // Tabela dos itens do dia
       c.appendChild(div('tw mb3',mkTable(
-        ['Item','Categoria','Qtd','Un','Destino','Responsável','Obs'],
+        ['Item','Categoria','Qtd','Un','Destino','Responsável',''],
         dItens.map(it=>{
           const cat=it.lola_estoque_itens?.categoria;
           const saida=it.lola_saidas;
+          const acoesSaida=div('fl_ gap2');
+          acoesSaida.appendChild(btn('btn bg bsm','✏️',()=>modalEditarSaida(saida,()=>pgSaidas(c))));
+          acoesSaida.appendChild(btn('btn bd bsm','🗑',async()=>{
+            if(!confirm('Excluir esta saída de '+new Date((saida?.data_saida||'')+'T12:00:00').toLocaleDateString('pt-BR')+'?'))return;
+            await db('lola_saidas_itens','DELETE',null,'?saida_id=eq.'+saida.id);
+            await db('lola_saidas','DELETE',null,'?id=eq.'+saida.id);
+            pgSaidas(c);
+          }));
           return[
             el('strong',null,it.lola_estoque_itens?.nome||it.nome_item||'—'),
             cat?el('span','tss',CONT_CATS[cat]||cat):span('tss','—'),
@@ -2239,7 +2287,7 @@ async function pgSaidas(c){
             it.unidade||it.lola_estoque_itens?.unidade||'—',
             el('span','tss',destLabels[saida?.destino]||saida?.destino||'—'),
             el('span','tss',saida?.responsavel||'—'),
-            el('span','tss',it.observacoes||saida?.observacoes||'—'),
+            acoesSaida,
           ];
         }),
         [null,null,'tr','tr',null,null,null]
@@ -2717,7 +2765,7 @@ function drawForn(w,busca){
     if(wp){
       const bWp=document.createElement('a');bWp.href='https://wa.me/'+wp;bWp.target='_blank';
       bWp.style.cssText='display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:50px;background:#25D366;color:#fff;font-family:Nunito,sans-serif;font-size:12px;font-weight:700;text-decoration:none';
-      bWp.innerHTML='<svg width="13" height="13" viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg> Conversar no WZ';
+      bWp.innerHTML='<svg width="13" height="13" viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg> WhatsApp';
       acoes.appendChild(bWp);
     }
     card.appendChild(acoes);w.appendChild(card);
@@ -3309,8 +3357,18 @@ async function registrarRecebimento(p){
             qtd_recebida:parseFloat(v.qtdRecebida)||0,unidade:v.item.unidade
           });
         }
-        // Atualizar status do pedido
-        await db('lola_pedidos','PATCH',{status:statusReceb},'?id=eq.'+p.id);
+        // Calcular novo valor total pela qtd recebida
+        const itensParaValor=await db('lola_pedidos_itens','GET',null,'?pedido_id=eq.'+p.id);
+        let novoTotal=0;
+        for(const v of Object.values(recvMap)){
+          const itemPed=itensParaValor.find(x=>x.id===v.item.id);
+          const preco=parseFloat(itemPed?.preco_unitario)||0;
+          novoTotal+=parseFloat(v.qtdRecebida)*preco;
+          // Atualizar quantidade do item pelo recebido
+          await db('lola_pedidos_itens','PATCH',{quantidade:parseFloat(v.qtdRecebida)},'?id=eq.'+v.item.id);
+        }
+        // Atualizar status e valor total do pedido
+        await db('lola_pedidos','PATCH',{status:statusReceb,valor_total:novoTotal},'?id=eq.'+p.id);
         p.status=statusReceb;
         _peds=await db('lola_pedidos','GET',null,'?select=*&order=created_at.desc');
         drawPed($('#ped-t'));
