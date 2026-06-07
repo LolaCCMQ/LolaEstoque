@@ -449,31 +449,37 @@ async function pgIns(c){
 }
 
 function mkInsTable(itens){
-  return div('tw mb3',mkTable(
-    ['Nome','Categoria','Un. compra','Qtd comprada','Valor pago','Custo por un.',''],
-    itens.map(i=>{
-      const unCusto=i.unidade_custo||'kg';
-      // unidade_compra agora é salva como o valor real (g, ml, kg, L, un, cx...)
-      // manter compatibilidade com registros antigos (g/ml)
-      const unCompra=i.unidade_compra==='g/ml'?(unCusto==='L'?'ml':'g'):(i.unidade_compra||'g');
-      return [
-        el('strong',null,i.nome),
-        bq(i.categoria.split(' ')[0],'bct'),
-        unCompra,
-        N(i.qtd_comprada,0)+' '+unCompra,
-        el('span','bold',R(i.valor_pago)),
-        el('span','bold tv',R(i.custo_por_unidade)+' / '+unCusto),
-        div('fl_ gap2',[
-          btn('btn bg bsm','🔍',()=>ondeEUsado(i)),
-          btn('btn bg bsm','📈',()=>verHistoricoPreco(i)),
-          btn('btn bg bsm','✏️',()=>modalIns(i)),
-          btn('btn bd bsm','🗑',()=>delIns(i.id)),
-        ])
-      ];
-    }),
-    [null,null,'tr','tr','tr','tr',null]
-  ));
+  const wrap=document.createElement('div');
+  itens.forEach(i=>{
+    const unCusto=i.unidade_custo||'kg';
+    const unCompra=i.unidade_compra==='g/ml'?(unCusto==='L'?'ml':'g'):(i.unidade_compra||'g');
+    const card=document.createElement('div');
+    card.style.cssText='background:#fff;border:1.5px solid var(--rb);border-radius:12px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap';
+    const info=document.createElement('div');info.style.cssText='flex:1;min-width:160px';
+    const nm=document.createElement('div');nm.style.cssText='font-size:14px;font-weight:700';nm.textContent=i.nome;
+    const meta=document.createElement('div');meta.style.cssText='font-size:11px;color:var(--ts);margin-top:3px;display:flex;gap:10px;flex-wrap:wrap;align-items:center';
+    const catBadge=bq(i.categoria.split(' ')[0],'bct');
+    const metaExtra=document.createElement('span');metaExtra.textContent=unCompra+' \u00B7 '+N(i.qtd_comprada,0)+' '+unCompra+' \u00B7 pago: '+R(i.valor_pago);
+    meta.appendChild(catBadge);meta.appendChild(metaExtra);
+    info.appendChild(nm);info.appendChild(meta);card.appendChild(info);
+    const vcusto=document.createElement('div');vcusto.style.cssText='text-align:right;flex-shrink:0';
+    vcusto.innerHTML='<div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:1px">Custo/'+unCusto+'</div><div style="font-size:15px;font-weight:800;color:var(--v)">'+R(i.custo_por_unidade)+'</div>';
+    card.appendChild(vcusto);
+    const btns=document.createElement('div');btns.style.cssText='display:flex;gap:5px;flex-shrink:0';
+    btns.appendChild(btn('btn bg bsm','\u{1F50D}',()=>ondeEUsado(i)));
+    btns.appendChild(btn('btn bg bsm','\u{1F4C8}',()=>modalHistoricoPreco(i)));
+    btns.appendChild(btn('btn bg bsm','\u270F\uFE0F',()=>modalIns(i)));
+    btns.appendChild(btn('btn bd bsm','\u{1F5D1}',async()=>{
+      if(!confirm('Excluir "'+i.nome+'"?'))return;
+      await db('lola_insumos','PATCH',{ativo:false},'?id=eq.'+i.id);
+      _ins=_ins.filter(x=>x.id!==i.id);
+      window._drawIns&&window._drawIns(document.getElementById('ins-t'));
+    }));
+    card.appendChild(btns);wrap.appendChild(card);
+  });
+  return wrap;
 }
+
 
 async function delIns(id){
   if(!confirm('Excluir este insumo?'))return;
@@ -3208,6 +3214,184 @@ function pedFiltrados(){
   return f;
 }
 
+// Nova função registrarRecebimento
+async function registrarRecebimento(p){
+  const ov=div('ov');const mo=div('mo mol');
+  mo.style.cssText+='display:flex;flex-direction:column;overflow:hidden';
+  mo.addEventListener('click',e=>e.stopPropagation());
+  ov.addEventListener('click',e=>{if(e.target===ov)ov.remove();});
+  mo.appendChild(div('mh',[
+    el('h3',null,'\u{1F4E6} Registrar Recebimento — Pedido #'+p.numero_pedido),
+    btn('xb','\u{2715}',()=>ov.remove())
+  ]));
+  const mb=div('mb');mb.appendChild(ld());
+  mo.appendChild(mb);ov.appendChild(mo);document.body.appendChild(ov);
+  try{
+    const itens=await db('lola_pedidos_itens','GET',null,'?select=*&pedido_id=eq.'+p.id);
+    mb.innerHTML='';
+    // Campos do recebedor
+    const _resp={v:''};
+    const inpResp=finp('',_resp.v,v=>_resp.v=v);inpResp.placeholder='Seu nome (obrigatório)';
+    mb.appendChild(div('fg2 mb3',[
+      fgrp('Recebido por',inpResp),
+      fgrp('Data',el('input','fi',null,{type:'date',value:new Date().toISOString().split('T')[0],id:'inp-data-receb'}))
+    ]));
+    // Instrução
+    const dica=document.createElement('div');
+    dica.style.cssText='background:var(--rt);border:1.5px solid var(--rb);border-radius:10px;padding:10px 14px;font-size:12px;font-weight:600;color:var(--v);margin-bottom:14px';
+    dica.textContent='Confira cada item e informe a quantidade recebida. Deixe igual ao solicitado se foi recebido completo.';
+    mb.appendChild(dica);
+    // Tabela de itens com input de qtd recebida
+    const recvMap={};
+    itens.forEach(it=>{recvMap[it.id]={item:it,qtdRecebida:parseFloat(it.quantidade)||0};});
+    const tblWrap=document.createElement('div');tblWrap.style.cssText='overflow-x:auto';
+    const tbl=document.createElement('table');tbl.style.cssText='width:100%;border-collapse:collapse';
+    const thead=document.createElement('thead');
+    const htr=document.createElement('tr');
+    ['Item','Un','Qtd\u00a0solicitada','Qtd\u00a0recebida','Difer.'].forEach((h,i)=>{
+      const th=document.createElement('th');
+      th.style.cssText='padding:7px 10px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--v);background:var(--rt);text-align:'+(i>=2?'right':'left');
+      th.textContent=h;htr.appendChild(th);
+    });
+    thead.appendChild(htr);tbl.appendChild(thead);
+    const tbody=document.createElement('tbody');
+    itens.forEach((it,idx)=>{
+      const tr=document.createElement('tr');
+      tr.style.cssText=(idx%2===0?'background:var(--rf)':'background:#fff')+';border-bottom:1px solid var(--rb)';
+      function mkTd(content,align,style){
+        const td=document.createElement('td');
+        td.style.cssText='padding:8px 10px;font-size:12px;text-align:'+(align||'left')+(style?';'+style:'');
+        if(typeof content==='string'||typeof content==='number')td.textContent=String(content);
+        else td.appendChild(content);return td;
+      }
+      tr.appendChild(mkTd(it.nome_item,'left','font-weight:600'));
+      tr.appendChild(mkTd(it.unidade||''));
+      tr.appendChild(mkTd(N(it.quantidade,1),'right','font-weight:700'));
+      // Input qtd recebida
+      const tdRecv=document.createElement('td');tdRecv.style.cssText='padding:4px 10px;text-align:right';
+      const inpR=document.createElement('input');inpR.type='number';inpR.min='0';inpR.step='0.5';
+      inpR.value=N(it.quantidade,1);
+      inpR.style.cssText='width:80px;padding:5px 7px;border:2px solid var(--rb);border-radius:8px;font-size:13px;text-align:right;font-family:Nunito,sans-serif;font-weight:700';
+      inpR.setAttribute('inputmode','decimal');
+      const difTd=document.createElement('td');difTd.style.cssText='padding:8px 10px;font-size:12px;text-align:right;font-weight:700';
+      function updateDif(){
+        const sol=parseFloat(it.quantidade)||0;const recv=parseFloat(inpR.value)||0;
+        recvMap[it.id].qtdRecebida=recv;
+        const dif=recv-sol;
+        difTd.textContent=(dif>0?'+':'')+N(dif,1);
+        difTd.style.color=dif===0?'var(--vd)':dif<0?'#dc2626':'#c47700';
+        inpR.style.borderColor=dif===0?'var(--vd)':dif<0?'#dc2626':'#c47700';
+      }
+      inpR.addEventListener('input',updateDif);updateDif();
+      tdRecv.appendChild(inpR);tr.appendChild(tdRecv);tr.appendChild(difTd);
+      tbody.appendChild(tr);
+    });
+    tbl.appendChild(tbody);tblWrap.appendChild(tbl);mb.appendChild(tblWrap);
+    // Footer
+    mo.appendChild(div('mf',[
+      btn('btn bg','Cancelar',()=>ov.remove()),
+      btn('btn bp','\u{1F4BE} Salvar recebimento',async()=>{
+        const respVal=_resp.v.trim();
+        if(!respVal){inpResp.style.borderColor='#dc2626';inpResp.focus();alert('Informe quem recebeu.');return;}
+        const dataReceb=document.getElementById('inp-data-receb')?.value||new Date().toISOString().split('T')[0];
+        // Verificar divergências
+        const divergencias=Object.values(recvMap).filter(v=>parseFloat(v.qtdRecebida)!==parseFloat(v.item.quantidade));
+        const statusReceb=divergencias.length>0?'recebido_divergencia':'recebido_completo';
+        // Salvar recebimento
+        const[receb]=await db('lola_pedidos_recebimentos','POST',{
+          pedido_id:p.id,recebido_por:respVal,data_recebimento:dataReceb,status:statusReceb
+        });
+        // Salvar itens do recebimento
+        for(const v of Object.values(recvMap)){
+          await db('lola_pedidos_recebimentos_itens','POST',{
+            recebimento_id:receb.id,pedido_item_id:v.item.id,
+            nome_item:v.item.nome_item,qtd_solicitada:parseFloat(v.item.quantidade)||0,
+            qtd_recebida:parseFloat(v.qtdRecebida)||0,unidade:v.item.unidade
+          });
+        }
+        // Atualizar status do pedido
+        await db('lola_pedidos','PATCH',{status:statusReceb},'?id=eq.'+p.id);
+        p.status=statusReceb;
+        _peds=await db('lola_pedidos','GET',null,'?select=*&order=created_at.desc');
+        drawPed($('#ped-t'));
+        ov.remove();
+        // Se tiver divergência, abrir modal de relatório
+        if(divergencias.length>0){
+          setTimeout(()=>verDivergencias(p,divergencias,dataReceb,respVal),300);
+        }else{
+          alert('\u{2705} Recebimento registrado! Pedido recebido completo.');
+        }
+      })
+    ]));
+  }catch(e){mb.innerHTML='<p style="color:red;padding:20px">'+e.message+'</p>';}
+}
+
+async function verDivergencias(p,divs,data,resp){
+  // Buscar divergências do banco se não foram passadas direto
+  let divergencias=divs;
+  if(!divergencias){
+    const receb=await db('lola_pedidos_recebimentos','GET',null,'?pedido_id=eq.'+p.id+'&order=created_at.desc&limit=1');
+    if(!receb.length)return;
+    const itens=await db('lola_pedidos_recebimentos_itens','GET',null,'?recebimento_id=eq.'+receb[0].id+'&select=*');
+    divergencias=itens.filter(it=>parseFloat(it.qtd_recebida)!==parseFloat(it.qtd_solicitada)).map(it=>({item:{nome_item:it.nome_item,quantidade:it.qtd_solicitada,unidade:it.unidade},qtdRecebida:it.qtd_recebida}));
+    data=receb[0].data_recebimento;resp=receb[0].recebido_por;
+  }
+  if(!divergencias||!divergencias.length){alert('Nenhuma divergência registrada.');return;}
+  const dataFmt=new Date((data||new Date().toISOString().split('T')[0])+'T12:00:00').toLocaleDateString('pt-BR');
+  const ov=div('ov');const mo=div('mo mol');
+  mo.addEventListener('click',e=>e.stopPropagation());
+  ov.addEventListener('click',e=>{if(e.target===ov)ov.remove();});
+  mo.appendChild(div('mh',[
+    el('h3',null,'\u{26A0}\u{FE0F} Divergências — Pedido #'+p.numero_pedido),
+    btn('xb','\u{2715}',()=>ov.remove())
+  ]));
+  const mb=div('mb');
+  mb.appendChild(div('al alw mb3','Recebido por '+resp+' em '+dataFmt+'. Os itens abaixo foram recebidos em quantidade diferente do solicitado.'));
+  const tbl=div('tw mb3',mkTable(
+    ['Item','Un','Solicitado','Recebido','Diferen\u00e7a'],
+    divergencias.map(v=>{
+      const sol=parseFloat(v.item.quantidade)||0;const recv=parseFloat(v.qtdRecebida)||0;const dif=recv-sol;
+      return[
+        el('strong',null,v.item.nome_item||v.item.nome||'—'),
+        v.item.unidade||'',
+        el('span','bold',N(sol,1)),
+        el('span','bold',N(recv,1)),
+        el('span',dif<0?'bold ecr':'bold',( dif>0?'+':'')+N(dif,1))
+      ];
+    }),
+    [null,null,'tr','tr','tr']
+  ));
+  mb.appendChild(tbl);
+  mo.appendChild(mb);
+  // Botões: Imprimir | WhatsApp Central
+  const linhasDiv=divergencias.map(v=>{
+    const sol=parseFloat(v.item.quantidade)||0;const recv=parseFloat(v.qtdRecebida)||0;
+    return (v.item.nome_item||v.item.nome||'?')+': solicitado '+N(sol,1)+' '+v.item.unidade+', recebido '+N(recv,1)+' '+v.item.unidade;
+  }).join('\n');
+  const msgWz='Divergencias no recebimento do Pedido #'+p.numero_pedido+' ('+dataFmt+'):\n\n'+linhasDiv+'\n\nPor favor verificar e reenviar os itens pendentes.\n\nLola Bar CCMQ';
+  mo.appendChild(div('mf',[
+    btn('btn bg','Fechar',()=>ov.remove()),
+    btn('btn bo bsm','\u{1F5A8}\u{FE0F} Imprimir',()=>{
+      const w=window.open('','_blank');
+      let h='<html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;padding:20px}h1{color:#AA2B2B}table{width:100%;border-collapse:collapse;margin-top:16px}th{background:#AA2B2B;color:#fff;padding:8px 10px;text-align:left}td{padding:8px 10px;border-bottom:1px solid #eee}strong{color:#dc2626}</style></head><body>';
+      h+='<h1>\u{26A0}\u{FE0F} Relat\u00F3rio de Diverg\u00EAncias</h1>';
+      h+='<p><strong>Pedido:</strong> #'+p.numero_pedido+' &nbsp; <strong>Data recebimento:</strong> '+dataFmt+' &nbsp; <strong>Recebido por:</strong> '+resp+'</p>';
+      h+='<table><tr><th>Item</th><th>Solicitado</th><th>Recebido</th><th>Diferen\u00E7a</th></tr>';
+      divergencias.forEach(v=>{const sol=parseFloat(v.item.quantidade)||0;const recv=parseFloat(v.qtdRecebida)||0;const dif=recv-sol;h+='<tr><td><strong>'+( v.item.nome_item||v.item.nome||'')+'</strong></td><td>'+N(sol,1)+' '+(v.item.unidade||'')+'</td><td>'+N(recv,1)+' '+(v.item.unidade||'')+'</td><td style="color:'+(dif<0?'#dc2626':'#c47700')+';font-weight:700">'+(dif>0?'+':'')+N(dif,1)+'</td></tr>';});
+      h+='</table></body></html>';
+      w.document.write(h);w.print();
+    }),
+    (()=>{
+      const bWz=document.createElement('button');bWz.type='button';
+      bWz.style.cssText='display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:50px;border:none;background:#25D366;color:#fff;font-family:Nunito,sans-serif;font-size:13px;font-weight:700;cursor:pointer';
+      bWz.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg> Enviar p/ Central';
+      bWz.addEventListener('click',()=>window.open('https://wa.me/?text='+encodeURIComponent(msgWz),'_blank'));
+      return bWz;
+    })()
+  ]));
+  ov.appendChild(mo);document.body.appendChild(ov);
+}
+
 function drawPed(w){
   w.innerHTML='';
   const f=pedFiltrados();
@@ -3222,6 +3406,8 @@ function drawPed(w){
         confirmado:'background:#dbeafe;color:#1d4ed8',
         entregue:'background:#f3e8ff;color:#7c3aed',
         cancelado:'background:#fee2e2;color:#dc2626',
+        recebido_completo:'background:#dcfce7;color:#166534',
+        recebido_divergencia:'background:#fef3c7;color:#92400e',
       };
       // Rascunho: mostrar badge simples sem select (não pode mudar status)
       let statusEl;
@@ -3233,7 +3419,7 @@ function drawPed(w){
           sel.style.cssText='padding:6px 12px;font-size:12px;font-weight:700;border-radius:50px;border:none;cursor:pointer;font-family:Nunito,sans-serif;min-width:130px;'+(STATUS_COLORS[status]||'');
         }
         applySelStyle(p.status);
-        ['solicitado','confirmado','entregue','cancelado'].forEach(s=>{
+        ['solicitado','confirmado','recebido_completo','recebido_divergencia','entregue','cancelado'].forEach(s=>{
           const o=document.createElement('option');o.value=s;o.textContent=s;
           if(s===p.status)o.selected=true;sel.appendChild(o);
         });
@@ -3265,6 +3451,12 @@ function drawPed(w){
               drawPed($('#ped-t'));
             });
             wrap.appendChild(envBtn);
+          } else if(p.status==='solicitado'||p.status==='confirmado'){
+            wrap.appendChild(btn('btn bo bsm','📥 Receber',()=>registrarRecebimento(p)));
+            wrap.appendChild(btn('btn bo bsm no-print','🖨️',()=>imprimirPed(p)));
+          } else if(p.status==='recebido_divergencia'){
+            wrap.appendChild(btn('btn bo bsm','⚠️ Diverg.',()=>verDivergencias(p,null,null,null)));
+            wrap.appendChild(btn('btn bo bsm no-print','🖨️',()=>imprimirPed(p)));
           } else {
             wrap.appendChild(btn('btn bo bsm no-print','🖨️',()=>imprimirPed(p)));
           }
