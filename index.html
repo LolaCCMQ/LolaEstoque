@@ -363,13 +363,15 @@ async function renderPage(){
 async function pgDash(c){
   c.appendChild(ld());
   try{
-    const[ai,af,ap,ar,pr,uc]=await Promise.all([
+    const[ai,af,ap,ar,pr,uc,rv_ft,rv_pp]=await Promise.all([
       db('lola_insumos','GET',null,'?select=id&ativo=eq.true'),
       db('lola_fichas_tecnicas','GET',null,'?select=id&ativo=eq.true'),
       db('lola_pedidos','GET',null,'?select=id&status=eq.solicitado'),
       db('lola_preproducoes','GET',null,'?select=id&ativo=eq.true'),
       db('lola_pedidos','GET',null,'?select=*&order=created_at.desc&limit=6'),
       db('lola_contagens','GET',null,'?order=data_contagem.desc&limit=3'),
+      db('lola_fichas_tecnicas','GET',null,'?select=id,nome&ativo=eq.true&revisar=eq.true'),
+      db('lola_preproducoes','GET',null,'?select=id,nome&ativo=eq.true&revisar=eq.true'),
     ]);
     c.innerHTML='';
     c.appendChild(div('g3',[
@@ -377,6 +379,21 @@ async function pgDash(c){
       mkStat('🍳','Pré-produções',ar.length,'preparos mapeados'),
       mkStat('🛒','Pedidos solicitados',ap.length,'aguardando Central',ap.length>0?'var(--v)':'var(--vd)'),
     ]));
+    if((rv_ft||[]).length+(rv_pp||[]).length>0){
+      const tot=(rv_ft||[]).length+(rv_pp||[]).length;
+      const alRev=document.createElement('div');
+      alRev.style.cssText='background:#fef3c7;border:1.5px solid #fcd34d;border-radius:12px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap';
+      const alL=document.createElement('div');
+      alL.innerHTML='<strong style="color:#92400e">⚠️ '+tot+' ficha'+(tot>1?'s':'')+' pendente'+(tot>1?'s':'')+' de revisão</strong>';
+      const sub=document.createElement('div');sub.style.cssText='font-size:11px;color:#92400e;margin-top:3px';
+      sub.textContent=[...(rv_ft||[]),...(rv_pp||[])].map(x=>x.nome).join(', ');
+      alL.appendChild(sub);
+      const alR=document.createElement('div');alR.style.cssText='display:flex;gap:6px;flex-shrink:0';
+      if((rv_ft||[]).length)alR.appendChild(btn('btn bo bsm','Fichas Técnicas',()=>nav('fichas')));
+      if((rv_pp||[]).length)alR.appendChild(btn('btn bo bsm','Pré-produções',()=>nav('preproducoes')));
+      alRev.appendChild(alL);alRev.appendChild(alR);
+      c.appendChild(alRev);
+    }
     // Últimas contagens
     if(uc.length){
       const cardCont=div('card mb3');
@@ -1017,6 +1034,7 @@ function drawPP(w){
         s.textContent='🔄 Pré-preparo';
         selosRow.appendChild(s);
       }
+      if(p.revisar){const rv2=document.createElement('span');rv2.style.cssText='margin-left:6px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:50px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;cursor:pointer';rv2.textContent='⚠️ revisar';rv2.title=p.revisar_motivo||'';rv2.addEventListener('click',e=>{e.stopPropagation();modalRevisarFicha('pp',p);});nomeCell.appendChild(rv2);}
       if((p.destinos||[]).length||p.e_preparo) nomeCell.appendChild(selosRow);
 
       return[
@@ -1028,14 +1046,13 @@ function drawPP(w){
         edInfo,
         (()=>{
           const wrap=div('fl_ gap2');
+          const bMk2=btn('btn bg bsm',p.revisar?'⚠️ Revisar':'⚠️',()=>modalRevisarFicha('pp',p));
+          if(p.revisar){bMk2.style.cssText='padding:3px 8px;border-radius:50px;background:#fef3c7;color:#92400e;font-size:11px;font-weight:700;border:1.5px solid #fcd34d;white-space:nowrap;cursor:pointer';}
+          bMk2.title=p.revisar?p.revisar_motivo||'':'Marcar para revisar';
+          wrap.appendChild(bMk2);
           wrap.appendChild(btn('btn bg bsm','📋',()=>verFichaPrep(p)));
           wrap.appendChild(btn('btn bg bsm','✏️',()=>modalPrep(p)));
-          wrap.appendChild(btn('btn bd bsm','🗑',async()=>{
-            if(!confirm('Excluir "'+p.nome+'"?'))return;
-            await db('lola_preproducoes','PATCH',{ativo:false},'?id=eq.'+p.id);
-            _pp=await db('lola_preproducoes','GET',null,'?select=*&ativo=eq.true&order=nome.asc');
-            drawPP($('#pp-t'));
-          }));
+          wrap.appendChild(btn('btn bd bsm','🗑',async()=>{if(!confirm('Excluir "'+p.nome+'"?'))return;await db('lola_preproducoes','PATCH',{ativo:false},'?id=eq.'+p.id);_pp=await db('lola_preproducoes','GET',null,'?select=*&ativo=eq.true&order=nome.asc');drawPP($('#pp-t'));}));
           return wrap;
         })()
       ];
@@ -1364,6 +1381,50 @@ function editarDestinos(ficha, onSave){
   });
 }
 
+function modalRevisarFicha(tipo,item){
+  const tabela=tipo==='ft'?'lola_fichas_tecnicas':'lola_preproducoes';
+  const reload=tipo==='ft'?
+    ()=>db(tabela,'GET',null,'?select=*&ativo=eq.true&order=nome.asc').then(d=>{_ft=d;drawFT($('#ft-t'));}) :
+    ()=>db(tabela,'GET',null,'?select=*&ativo=eq.true&order=nome.asc').then(d=>{_pp=d;drawPP($('#pp-t'));});
+  if(item.revisar){
+    const ov=div('ov');const mo=div('mo');
+    mo.addEventListener('click',e=>e.stopPropagation());
+    ov.addEventListener('click',e=>{if(e.target===ov)ov.remove();});
+    mo.appendChild(div('mh',[el('h3',null,'\u26A0\uFE0F Pendente de revis\u00E3o \u2014 '+item.nome),btn('xb','\u2715',()=>ov.remove())]));
+    const mb=div('mb');
+    const motEl=document.createElement('div');
+    motEl.style.cssText='background:#fef3c7;border:1.5px solid #fcd34d;border-radius:10px;padding:12px 14px;font-size:13px;color:#92400e;margin-bottom:16px';
+    motEl.innerHTML='<strong>Motivo:</strong> '+(item.revisar_motivo||'N\u00E3o informado');
+    mb.appendChild(motEl);
+    mo.appendChild(mb);
+    mo.appendChild(div('mf',[
+      btn('btn bg','Fechar',()=>ov.remove()),
+      btn('btn bv','Marcar como revisado',async()=>{
+        await db(tabela,'PATCH',{revisar:false,revisar_motivo:null},'?id=eq.'+item.id);
+        item.revisar=false;item.revisar_motivo=null;
+        ov.remove();reload();
+      }),
+    ]));
+    ov.appendChild(mo);document.body.appendChild(ov);
+  } else {
+    const motivo={v:''};
+    const inpMot=document.createElement('textarea');
+    inpMot.className='fi';inpMot.rows=3;
+    inpMot.placeholder='Descreva o motivo da revis\u00E3o (obrigat\u00F3rio)...';
+    inpMot.style.cssText='width:100%;resize:vertical;min-height:80px';
+    inpMot.addEventListener('input',e=>motivo.v=e.target.value);
+    mkModal('\u26A0\uFE0F Marcar para revis\u00E3o \u2014 '+item.nome,[
+      div('al ali mb3','Explique o motivo. Isso ficar\u00E1 vis\u00EDvel para toda a equipe.'),
+      fgrp('Motivo da revis\u00E3o',inpMot),
+    ],async()=>{
+      if(!motivo.v.trim()){alert('O motivo \u00E9 obrigat\u00F3rio.');throw new Error('vazio');}
+      await db(tabela,'PATCH',{revisar:true,revisar_motivo:motivo.v.trim()},'?id=eq.'+item.id);
+      item.revisar=true;item.revisar_motivo=motivo.v.trim();
+      reload();
+    });
+  }
+}
+
 function drawFT(w){
   w.innerHTML='';
   let f=_ftTab==='todos'?[..._ft]:
@@ -1407,6 +1468,7 @@ function drawFT(w){
       const nomeStrong=document.createElement('strong');
       nomeStrong.textContent=x.nome;
       nomeCell.appendChild(nomeStrong);
+      if(x.revisar){const rv=document.createElement('span');rv.style.cssText='margin-left:6px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:50px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;cursor:pointer';rv.textContent='⚠️ revisar';rv.title=x.revisar_motivo||'';rv.addEventListener('click',e=>{e.stopPropagation();modalRevisarFicha('ft',x);});nomeCell.appendChild(rv);}
       const selosRow=document.createElement('div');
       selosRow.style.cssText='display:flex;gap:4px;flex-wrap:wrap;margin-top:4px';
       (x.destinos||[]).forEach(d=>{
@@ -1424,14 +1486,13 @@ function drawFT(w){
         edInfo2,
         (()=>{
           const wrap=div('fl_ gap2');
+          const bMk=btn('btn bg bsm',x.revisar?'⚠️ Revisar':'⚠️',()=>modalRevisarFicha('ft',x));
+          if(x.revisar){bMk.style.cssText='padding:3px 8px;border-radius:50px;background:#fef3c7;color:#92400e;font-size:11px;font-weight:700;border:1.5px solid #fcd34d;white-space:nowrap;cursor:pointer';}
+          bMk.title=x.revisar?x.revisar_motivo||'':'Marcar para revisar';
+          wrap.appendChild(bMk);
           wrap.appendChild(btn('btn bg bsm','📋',()=>verFichaFT(x)));
           wrap.appendChild(btn('btn bg bsm','✏️',()=>modalFicha(x)));
-          const del=btn('btn bd bsm','🗑',async()=>{
-            if(!confirm('Excluir '+x.nome+'?'))return;
-            await db('lola_fichas_tecnicas','PATCH',{ativo:false},'?id=eq.'+x.id);
-            _ft=await db('lola_fichas_tecnicas','GET',null,'?select=*&ativo=eq.true&order=nome.asc');
-            drawFT($('#ft-t'));
-          });
+          const del=btn('btn bd bsm','🗑',async()=>{if(!confirm('Excluir '+x.nome+'?'))return;await db('lola_fichas_tecnicas','PATCH',{ativo:false},'?id=eq.'+x.id);_ft=await db('lola_fichas_tecnicas','GET',null,'?select=*&ativo=eq.true&order=nome.asc');drawFT($('#ft-t'));});
           wrap.appendChild(del);
           return wrap;
         })()
@@ -2269,17 +2330,21 @@ async function pgSaidas(c){
       // Tabela dos itens do dia
       c.appendChild(div('tw mb3',mkTable(
         ['Item','Categoria','Qtd','Un','Destino','Responsável',''],
-        dItens.map(it=>{
+        dItens.map((it,_si)=>{
           const cat=it.lola_estoque_itens?.categoria;
           const saida=it.lola_saidas;
-          const acoesSaida=div('fl_ gap2');
-          acoesSaida.appendChild(btn('btn bg bsm','✏️',()=>modalEditarSaida(saida,()=>pgSaidas(c))));
-          acoesSaida.appendChild(btn('btn bd bsm','🗑',async()=>{
-            if(!confirm('Excluir esta saída de '+new Date((saida?.data_saida||'')+'T12:00:00').toLocaleDateString('pt-BR')+'?'))return;
-            await db('lola_saidas_itens','DELETE',null,'?saida_id=eq.'+saida.id);
-            await db('lola_saidas','DELETE',null,'?id=eq.'+saida.id);
-            pgSaidas(c);
-          }));
+          const isFirst=_si===0||dItens[_si-1].lola_saidas?.id!==saida?.id;
+          let acoesSaida;
+          if(isFirst){
+            acoesSaida=div('fl_ gap2');
+            acoesSaida.appendChild(btn('btn bg bsm','✏️',()=>modalEditarSaida(saida,()=>pgSaidas(c))));
+            acoesSaida.appendChild(btn('btn bd bsm','🗑',async()=>{
+              if(!confirm('Excluir esta saída de '+new Date((saida?.data_saida||'')+'T12:00:00').toLocaleDateString('pt-BR')+'?'))return;
+              await db('lola_saidas_itens','DELETE',null,'?saida_id=eq.'+saida.id);
+              await db('lola_saidas','DELETE',null,'?id=eq.'+saida.id);
+              pgSaidas(c);
+            }));
+          } else {acoesSaida=div(null);}
           return[
             el('strong',null,it.lola_estoque_itens?.nome||it.nome_item||'—'),
             cat?el('span','tss',CONT_CATS[cat]||cat):span('tss','—'),
@@ -3043,8 +3108,11 @@ async function modalNovaContagem(c){
   const dropPanel2=document.createElement('div');
   dropPanel2.style.cssText='display:none;border-top:2px solid var(--v);max-height:220px;overflow-y:auto;background:#fff;-webkit-overflow-scrolling:touch';
   let dp2Open=false;
-  function toggleDp2(){dp2Open=!dp2Open;dropPanel2.style.display=dp2Open?'block':'none';dropArr2.style.transform=dp2Open?'rotate(180deg)':'';}
+  function closeDp2(){dp2Open=false;dropPanel2.style.display='none';dropArr2.style.transform='';}
+  function openDp2(){dp2Open=true;dropPanel2.style.display='block';dropArr2.style.transform='rotate(180deg)';}
+  function toggleDp2(){dp2Open?closeDp2():openDp2();}
   dropBtn2.addEventListener('click',e=>{e.stopPropagation();toggleDp2();});
+  document.addEventListener('click',function _dph(e){if(dp2Open&&!dropWrap2.contains(e.target))closeDp2();if(!document.body.contains(dropWrap2))document.removeEventListener('click',_dph);});
   function mkCkItem(label,checked,onClick){
     const item=document.createElement('div');
     item.style.cssText='display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer;border-bottom:1px solid var(--rf)';
@@ -3429,6 +3497,20 @@ async function verDivergencias(p,divs,data,resp){
   const msgWz='Divergencias no recebimento do Pedido #'+p.numero_pedido+' ('+dataFmt+'):\n\n'+linhasDiv+'\n\nPor favor verificar e reenviar os itens pendentes.\n\nLola Bar CCMQ';
   mo.appendChild(div('mf',[
     btn('btn bg','Fechar',()=>ov.remove()),
+    btn('btn bp bsm','🧾 Nota recebimento',()=>{
+      const w2=window.open('','_blank');
+      const dtN=new Date((data||new Date().toISOString().split('T')[0])+'T12:00:00').toLocaleDateString('pt-BR');
+      let hn='<html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;padding:24px;max-width:680px;margin:0 auto}h1{color:#AA2B2B;border-bottom:2px solid #AA2B2B;padding-bottom:8px}.info{background:#f8f8f8;padding:10px 14px;border-radius:8px;margin-bottom:14px;font-size:13px}table{width:100%;border-collapse:collapse}th{background:#AA2B2B;color:#fff;padding:7px 10px;text-align:left;font-size:11px;text-transform:uppercase}td{padding:7px 10px;border-bottom:1px solid #eee;font-size:12px}.footer{margin-top:24px;font-size:10px;color:#aaa;text-align:center;border-top:1px solid #eee;padding-top:10px}</style></head><body>';
+      hn+='<h1>🧾 Nota de Recebimento</h1><div class="info"><strong>Pedido:</strong> #'+p.numero_pedido+'&nbsp;&nbsp;<strong>Data:</strong> '+dtN+'&nbsp;&nbsp;<strong>Recebido por:</strong> '+(resp||'—')+'</div>';
+      hn+='<table><tr><th>Item</th><th style="text-align:right">Solicitado</th><th style="text-align:right">Recebido</th><th style="text-align:right">Diferença</th><th>Un</th></tr>';
+      (divergencias||[]).forEach(v=>{
+        const s2=parseFloat(v.item.quantidade)||0,r2=parseFloat(v.qtdRecebida)||0,d2=r2-s2;
+        const c2=d2===0?'':'color:'+(d2<0?'#dc2626':'#c47700');
+        hn+='<tr><td><strong>'+(v.item.nome_item||v.item.nome||'')+'</strong></td><td style="text-align:right">'+N(s2,1)+'</td><td style="text-align:right;font-weight:700;'+c2+'">'+N(r2,1)+'</td><td style="text-align:right;'+c2+'">'+(d2>0?'+':'')+N(d2,1)+'</td><td>'+(v.item.unidade||'')+'</td></tr>';
+      });
+      hn+='<div class="footer">Gerado em '+new Date().toLocaleString('pt-BR')+' · Lola Bar CCMQ</div></body></html>';
+      w2.document.write(hn);w2.print();
+    }),
     btn('btn bo bsm','\u{1F5A8}\u{FE0F} Imprimir',()=>{
       const w=window.open('','_blank');
       let h='<html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;padding:20px}h1{color:#AA2B2B}table{width:100%;border-collapse:collapse;margin-top:16px}th{background:#AA2B2B;color:#fff;padding:8px 10px;text-align:left}td{padding:8px 10px;border-bottom:1px solid #eee}strong{color:#dc2626}</style></head><body>';
