@@ -2800,176 +2800,82 @@ async function modalNovaContagem(c){
   const grupos={};
   todosItens.forEach(it=>{if(!grupos[it.categoria])grupos[it.categoria]=[];grupos[it.categoria].push(it);});
   const qtds={};todosItens.forEach(it=>{qtds[it.id]={qtd:'',pedido:''};});
-
   const _autorCont={v:''};
-  const _tipoCont={v:'dom_seg'};
   const _dataCont={v:new Date().toISOString().split('T')[0]};
-
-  // Categorias disponíveis (que têm itens)
   const catsDisponiveis=Object.entries(CONT_CATS).filter(([cat])=>(grupos[cat]||[]).length>0);
-  // Seleção de categorias — começa com todas marcadas
   const catsSelecionadas=new Set(catsDisponiveis.map(([cat])=>cat));
-
   const form=div(null);
-
-  // ── Cabeçalho: responsável, tipo, data ──────────────────────────
   const inpResp=finp('',_autorCont.v,v=>_autorCont.v=v);inpResp.placeholder='Seu nome...';
-  const selTipo=fsel('',['dom_seg','quinta'],_tipoCont.v,v=>_tipoCont.v=v);
   const inpData=el('input','fi',null,{type:'date',value:_dataCont.v});
   inpData.addEventListener('change',e=>_dataCont.v=e.target.value);
-  form.appendChild(div('fg3 mb3',[fgrp('✍️ Responsável',inpResp),fgrp('Tipo',selTipo),fgrp('Data',inpData)]));
-
-  // ── Filtro de categorias ─────────────────────────────────────────
+  form.appendChild(div('fg2 mb3',[fgrp('Responsavel',inpResp),fgrp('Data',inpData)]));
   const filtroTit=document.createElement('div');
-  filtroTit.style.cssText='font-size:11px;font-weight:700;color:var(--ts);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px';
-  filtroTit.textContent='📋 O que vai contar hoje?';
+  filtroTit.style.cssText='font-size:11px;font-weight:700;color:var(--ts);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px';
+  filtroTit.textContent='O que vai contar hoje?';
   form.appendChild(filtroTit);
-
   const filtroWrap=document.createElement('div');
-  filtroWrap.style.cssText='display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px';
-
-  // Botão "Todas"
-  const btnTodas=document.createElement('button');
-  btnTodas.type='button';btnTodas.textContent='✓ Todas';
-  function styleBtnTodas(){
-    const todas=catsSelecionadas.size===catsDisponiveis.length;
-    btnTodas.style.cssText='padding:6px 13px;border-radius:50px;font-family:Nunito,sans-serif;font-size:11px;font-weight:700;cursor:pointer;border:2px solid '+(todas?'var(--v)':'var(--rb)')+';background:'+(todas?'var(--v)':'#fff')+';color:'+(todas?'#fff':'var(--ts)');
-  }
+  filtroWrap.style.cssText='display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:12px;-webkit-overflow-scrolling:touch;scrollbar-width:none';
+  const btnTodas=document.createElement('button');btnTodas.type='button';btnTodas.textContent='Todas';
+  function styleBtnTodas(){var t=catsSelecionadas.size===catsDisponiveis.length;btnTodas.style.cssText='white-space:nowrap;flex-shrink:0;padding:8px 14px;border-radius:50px;font-family:Nunito,sans-serif;font-size:12px;font-weight:700;cursor:pointer;border:2px solid '+(t?'var(--v)':'var(--rb)')+';background:'+(t?'var(--v)':'#fff')+';color:'+(t?'#fff':'var(--ts)');}
   styleBtnTodas();
-  btnTodas.addEventListener('click',()=>{
-    if(catsSelecionadas.size===catsDisponiveis.length){
-      catsSelecionadas.clear();
-    } else {
-      catsDisponiveis.forEach(([cat])=>catsSelecionadas.add(cat));
-    }
-    styleBtnTodas();
-    catBtns.forEach(({cat,btn})=>styleCatBtn(cat,btn));
-    renderItens();
-  });
+  btnTodas.addEventListener('click',function(){if(catsSelecionadas.size===catsDisponiveis.length)catsSelecionadas.clear();else catsDisponiveis.forEach(function(e){catsSelecionadas.add(e[0]);});styleBtnTodas();catBtns.forEach(function(x){styleCatBtn(x.cat,x.btn);});renderItens();});
   filtroWrap.appendChild(btnTodas);
-
-  // Botões por categoria
-  const catBtns=[];
-  function styleCatBtn(cat,b){
-    const sel=catsSelecionadas.has(cat);
-    b.style.cssText='padding:6px 13px;border-radius:50px;font-family:Nunito,sans-serif;font-size:11px;font-weight:700;cursor:pointer;border:2px solid '+(sel?'var(--v)':'var(--rb)')+';background:'+(sel?'var(--rt)':'#fff')+';color:'+(sel?'var(--v)':'var(--ts)');
-  }
-  catsDisponiveis.forEach(([cat,label])=>{
-    const b=document.createElement('button');b.type='button';
-    b.textContent=label;
-    styleCatBtn(cat,b);
-    b.addEventListener('click',()=>{
-      catsSelecionadas.has(cat)?catsSelecionadas.delete(cat):catsSelecionadas.add(cat);
-      styleCatBtn(cat,b);styleBtnTodas();
-      renderItens();
-    });
-    filtroWrap.appendChild(b);
-    catBtns.push({cat,btn:b});
+  var catBtns=[];
+  function styleCatBtn(cat,b){var s=catsSelecionadas.has(cat);b.style.cssText='white-space:nowrap;flex-shrink:0;padding:8px 14px;border-radius:50px;font-family:Nunito,sans-serif;font-size:12px;font-weight:700;cursor:pointer;border:2px solid '+(s?'var(--v)':'var(--rb)')+';background:'+(s?'var(--rt)':'#fff')+';color:'+(s?'var(--v)':'var(--ts)');}
+  catsDisponiveis.forEach(function(entry){var cat=entry[0];var label=entry[1];var b=document.createElement('button');b.type='button';b.textContent=label;styleCatBtn(cat,b);
+    b.addEventListener('click',function(){if(catsSelecionadas.has(cat))catsSelecionadas.delete(cat);else catsSelecionadas.add(cat);styleCatBtn(cat,b);styleBtnTodas();renderItens();});
+    filtroWrap.appendChild(b);catBtns.push({cat:cat,btn:b});
   });
   form.appendChild(filtroWrap);
-
-  // ── Área de itens (renderizada dinamicamente) ────────────────────
-  const itensArea=document.createElement('div');
-  form.appendChild(itensArea);
-
-  function mkCard(it,idx){
-    const card=document.createElement('div');
-    card.style.cssText='display:flex;align-items:center;gap:8px;padding:10px 10px;'+(idx%2===0?'background:var(--rf)':'background:#fff')+';border-radius:10px;margin-bottom:4px;border:1px solid var(--rb)';
-
-    // Info: nome + meta (unidade · mín)
-    const info=document.createElement('div');
-    info.style.cssText='flex:1;min-width:0';
-    const nome=document.createElement('div');
-    nome.style.cssText='font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
-    nome.textContent=it.nome;
-    const meta=document.createElement('div');
-    meta.style.cssText='font-size:10px;color:var(--ts);margin-top:2px';
-    meta.textContent=(it.unidade||'')+(it.qtd_minima?' · mín: '+N(it.qtd_minima,0):'');
+  var itensArea=document.createElement('div');form.appendChild(itensArea);
+  function mkCardCont(it,i){
+    var card=document.createElement('div');
+    card.style.cssText='display:flex;align-items:center;gap:8px;padding:10px;'+(i%2===0?'background:var(--rf)':'background:#fff')+';border-radius:10px;margin-bottom:4px;border:1px solid var(--rb)';
+    var info=document.createElement('div');info.style.cssText='flex:1;min-width:0';
+    var nome=document.createElement('div');nome.style.cssText='font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';nome.textContent=it.nome;
+    var meta=document.createElement('div');meta.style.cssText='font-size:10px;color:var(--ts);margin-top:2px';
+    meta.textContent=(it.unidade||'')+(it.qtd_minima?' min: '+N(it.qtd_minima,0):'');
     info.appendChild(nome);info.appendChild(meta);card.appendChild(info);
-
-    // Label + input contado
-    const wrapQ=document.createElement('div');
-    wrapQ.style.cssText='display:flex;flex-direction:column;align-items:center;gap:2px';
-    const lblQ=document.createElement('div');
-    lblQ.style.cssText='font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--ts)';
-    lblQ.textContent='Contado';
-    const inpQ=document.createElement('input');inpQ.type='number';inpQ.step='0.5';inpQ.min='0';
-    inpQ.value=qtds[it.id]?.qtd||'';
-    inpQ.placeholder='0';
+    function mkWrap(lbl,cor){var w=document.createElement('div');w.style.cssText='display:flex;flex-direction:column;align-items:center;gap:2px';var l=document.createElement('div');l.style.cssText='font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:'+(cor||'var(--ts)');l.textContent=lbl;w.appendChild(l);return w;}
+    var wQ=mkWrap('Contado');
+    var inpQ=document.createElement('input');inpQ.type='number';inpQ.step='0.5';inpQ.min='0';
+    inpQ.value=qtds[it.id]?qtds[it.id].qtd||'':'';inpQ.placeholder='0';
     inpQ.style.cssText='width:68px;padding:8px 4px;border:2px solid var(--rb);border-radius:10px;font-size:15px;text-align:center;font-family:Nunito,sans-serif;font-weight:700;background:#fff;-webkit-appearance:none';
-    inpQ.setAttribute('inputmode','decimal');
-    if(qtds[it.id]?.qtd!==''){
-      const v=parseFloat(qtds[it.id]?.qtd)||0;
-      const min=parseFloat(it.qtd_minima)||0;
-      inpQ.style.borderColor=v<=min?'#dc2626':'var(--vd)';
-    }
-    wrapQ.appendChild(lblQ);wrapQ.appendChild(inpQ);card.appendChild(wrapQ);
-
-    // Label + input pedido
-    const wrapP=document.createElement('div');
-    wrapP.style.cssText='display:flex;flex-direction:column;align-items:center;gap:2px';
-    const lblP=document.createElement('div');
-    lblP.style.cssText='font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--v)';
-    lblP.textContent='Pedido';
-    const inpP=document.createElement('input');inpP.type='number';inpP.step='0.5';inpP.min='0';
-    inpP.value=qtds[it.id]?.pedido||'';
-    inpP.placeholder='0';
+    inpQ.setAttribute('inputmode','decimal');wQ.appendChild(inpQ);card.appendChild(wQ);
+    var wP=mkWrap('Pedido','var(--v)');
+    var inpP=document.createElement('input');inpP.type='number';inpP.step='0.5';inpP.min='0';
+    inpP.value=qtds[it.id]?qtds[it.id].pedido||'':'';inpP.placeholder='0';
     inpP.style.cssText='width:62px;padding:8px 4px;border:2px solid var(--rb);border-radius:10px;font-size:14px;text-align:center;font-family:Nunito,sans-serif;color:var(--v);font-weight:700;background:#fff;-webkit-appearance:none';
     inpP.setAttribute('inputmode','decimal');
-
-    inpQ.addEventListener('input',e=>{
-      qtds[it.id].qtd=e.target.value;
-      const contado=parseFloat(e.target.value)||0;const min=parseFloat(it.qtd_minima)||0;
-      if(contado>0&&contado<=min){inpP.value=N(min-contado,1);qtds[it.id].pedido=min-contado;inpQ.style.borderColor='#dc2626';}
-      else if(contado===0&&min>0){inpP.value=N(min,1);qtds[it.id].pedido=min;inpQ.style.borderColor='#dc2626';}
+    inpQ.addEventListener('input',function(e){qtds[it.id].qtd=e.target.value;var cont=parseFloat(e.target.value)||0;var min=parseFloat(it.qtd_minima)||0;
+      if(cont>0&&cont<=min){inpP.value=N(min-cont,1);qtds[it.id].pedido=min-cont;inpQ.style.borderColor='#dc2626';}
+      else if(cont===0&&min>0){inpP.value=N(min,1);qtds[it.id].pedido=min;inpQ.style.borderColor='#dc2626';}
       else{inpP.value='';qtds[it.id].pedido='';inpQ.style.borderColor='var(--vd)';}
     });
-    inpP.addEventListener('input',e=>qtds[it.id].pedido=e.target.value);
-
-    wrapP.appendChild(lblP);wrapP.appendChild(inpP);card.appendChild(wrapP);
-    return card;
+    inpP.addEventListener('input',function(e){qtds[it.id].pedido=e.target.value;});
+    wP.appendChild(inpP);card.appendChild(wP);return card;
   }
-
   function renderItens(){
     itensArea.innerHTML='';
-    const catsFiltradas=catsDisponiveis.filter(([cat])=>catsSelecionadas.has(cat));
-    if(!catsFiltradas.length){
-      const aviso=document.createElement('div');
-      aviso.style.cssText='text-align:center;padding:24px;color:var(--ts);font-size:13px;font-weight:600';
-      aviso.textContent='Selecione ao menos uma categoria acima';
-      itensArea.appendChild(aviso);return;
-    }
-    catsFiltradas.forEach(([cat,label])=>{
-      const catItens=grupos[cat]||[];if(!catItens.length)return;
-      // Título da categoria
-      const secT=document.createElement('div');
-      secT.style.cssText='font-size:12px;font-weight:800;color:var(--v);margin:14px 0 6px;padding:5px 10px;background:var(--rt);border-radius:8px;border-left:3px solid var(--v)';
-      secT.textContent=label;itensArea.appendChild(secT);
-      catItens.forEach((it,i)=>itensArea.appendChild(mkCard(it,i)));
+    var cats=catsDisponiveis.filter(function(e){return catsSelecionadas.has(e[0]);});
+    if(!cats.length){var av=document.createElement('div');av.style.cssText='text-align:center;padding:24px;color:var(--ts);font-size:13px;font-weight:600';av.textContent='Selecione ao menos uma categoria acima';itensArea.appendChild(av);return;}
+    cats.forEach(function(entry){var cat=entry[0];var label=entry[1];
+      var catItens=grupos[cat]||[];if(!catItens.length)return;
+      var sec=document.createElement('div');sec.style.cssText='font-size:12px;font-weight:800;color:var(--v);margin:14px 0 6px;padding:5px 10px;background:var(--rt);border-radius:8px;border-left:3px solid var(--v)';sec.textContent=label;itensArea.appendChild(sec);
+      catItens.forEach(function(it,i){itensArea.appendChild(mkCardCont(it,i));});
     });
   }
   renderItens();
-
-  mkModal('📦 Nova Contagem de Estoque',[form],async()=>{
-    const[ct]=await db('lola_contagens','POST',{
-      data_contagem:_dataCont.v,
-      tipo:_tipoCont.v||'dom_seg',
-      responsavel:_autorCont.v||'Não informado',
-      unidade:'ccmq',
-      status:'rascunho',
-    });
-    const promises=[];
-    todosItens.forEach(it=>{
-      const q=qtds[it.id];
-      if(q.qtd!==''){promises.push(db('lola_contagem_itens','POST',{contagem_id:ct.id,estoque_item_id:it.id,qtd_contada:parseFloat(q.qtd)||0,pedido:q.pedido?parseFloat(q.pedido):null}));}
-    });
+  mkModal('Nova Contagem de Estoque',[form],async function(){
+    var[ct]=await db('lola_contagens','POST',{data_contagem:_dataCont.v,responsavel:_autorCont.v||'Nao informado',unidade:'ccmq',status:'rascunho'});
+    var promises=[];
+    todosItens.forEach(function(it){var q=qtds[it.id];if(q.qtd!==''){promises.push(db('lola_contagem_itens','POST',{contagem_id:ct.id,estoque_item_id:it.id,qtd_contada:parseFloat(q.qtd)||0,pedido:q.pedido?parseFloat(q.pedido):null}));}});
     await Promise.all(promises);
-    document.querySelector('.ov')?.remove();
-    mostrarListaPedidosFornecedor(ct.id,_dataCont.v,_tipoCont.v);
+    document.querySelector('.ov')&&document.querySelector('.ov').remove();
+    mostrarListaPedidosFornecedor(ct.id,_dataCont.v);
     renderContArea();
   },'mo mol');
 }
-
 async function mostrarListaPedidosFornecedor(contagemId, data, tipo){
   const ov=div('ov');const mo=div('mo mol');
   const dataFmt=new Date(data+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'});
