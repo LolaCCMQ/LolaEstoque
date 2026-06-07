@@ -1435,7 +1435,7 @@ async function pgFichas(c){
     c.innerHTML='';
     _ftBusca='';
     const ftSearchEl=mkSearch(q=>{_ftBusca=q;drawFT($('#ft-t'));},'Buscar ficha técnica...');
-    const ftTabsEl=mkTabs(['todos','ccmq','mac','eventos','pre'],_ftTab,t=>{_ftTab=t;drawFT($('#ft-t'));},['Tudo','CCMQ','MAC','Eventos','Pre'],true);
+    const ftTabsEl=mkTabs(['todos','ccmq','mac','eventos'],_ftTab,t=>{_ftTab=t;drawFT($('#ft-t'));},['Tudo','CCMQ','MAC','Eventos'],true);
     const ftBarEsq=div(null);ftBarEsq.style.cssText='display:flex;align-items:center;gap:8px;flex-wrap:wrap;';
     ftBarEsq.appendChild(ftTabsEl);ftBarEsq.appendChild(ftSearchEl);
     const ftBar=div('abar no-print');
