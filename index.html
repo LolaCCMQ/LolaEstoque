@@ -69,6 +69,8 @@ td .sub{font-size:10px;color:var(--ts);margin-top:2px;}
 .bconf{background:#dbeafe;color:#1d4ed8;font-weight:800;}
 .bent{background:#f3e8ff;color:#7c3aed;font-weight:800;}
 .bca{background:#fee2e2;color:#dc2626;font-weight:800;}
+.brec{background:#dcfce7;color:#166534;font-weight:800;}
+.bdiv{background:#fef3c7;color:#92400e;font-weight:800;}
 .ben{background:#dcfce7;color:#166534;}
 .bct{background:var(--rt);color:var(--v);}
 /* FORM */
@@ -171,7 +173,7 @@ const DBR=d=>d?new Date(d+'T12:00:00').toLocaleDateString('pt-BR'):'-';
 
 const UL={ccmq:'CCMQ',mac:'Mac',central:'Central',eventos:'Eventos'};
 const UB={ccmq:'bc',mac:'bm',central:'bce',eventos:'bev'};
-const SBS={rascunho:'bct',solicitado:'bsol',confirmado:'bconf',entregue:'bent',cancelado:'bca'};
+const SBS={rascunho:'bct',solicitado:'bsol',confirmado:'bconf',entregue:'bent',cancelado:'bca',recebido_completo:'brec',recebido_divergencia:'bdiv'};
 
 let PAGE='dashboard';
 let _ins=[],_pp=[],_ft=[],_cat=[];
@@ -3560,7 +3562,7 @@ function drawPed(w){
         }
         applySelStyle(p.status);
         ['solicitado','confirmado','recebido_completo','recebido_divergencia','entregue','cancelado'].forEach(s=>{
-          const o=document.createElement('option');o.value=s;o.textContent=s;
+          const o=document.createElement('option');o.value=s;o.textContent={rascunho:'Rascunho',solicitado:'Solicitado',confirmado:'Confirmado',entregue:'Entregue',cancelado:'Cancelado',recebido_completo:'Recebido completo',recebido_divergencia:'Recebido c/ diverg.'}[s]||s;
           if(s===p.status)o.selected=true;sel.appendChild(o);
         });
         sel.addEventListener('change',async e=>{
