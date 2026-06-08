@@ -411,14 +411,52 @@ async function pgDash(c){
       })));
       c.appendChild(cardCont);
     }
-    const card=div('card');
-    card.appendChild(div('bold mb3','📋 Pedidos recentes',{style:'font-family:Playfair Display,serif;font-size:16px;color:var(--v)'}));
-    if(!pr.length)card.appendChild(em('📋','Nenhum pedido ainda'));
-    else card.appendChild(div('tw',mkTable(
-      ['Nº','Unidade','Data','Status','Total'],
-      pr.map(p=>[el('strong',null,'#'+p.numero_pedido),bq(UL[p.unidade]||p.unidade,UB[p.unidade]||''),DBR(p.data_pedido),bq(p.status,SBS[p.status]||''),el('span','bold tv',R(p.valor_total))]),
-      [null,null,null,null,'tr']
-    )));
+    // Card pedidos aguardando central
+    const card=document.createElement('div');
+    card.style.cssText='background:#fff;border:1.5px solid var(--rb);border-radius:14px;padding:14px 16px;margin-top:8px';
+    const cardTit=document.createElement('div');
+    cardTit.style.cssText='display:flex;align-items:center;justify-content:space-between;margin-bottom:12px';
+    const titMain=document.createElement('div');
+    titMain.innerHTML='<div style="font-size:13px;font-weight:800;color:var(--v)">🛒 Pedidos aguardando Central</div>'+(pr.length?'<span style="margin-left:8px;padding:4px 12px;border-radius:50px;background:var(--v);color:#fff;font-size:12px;font-weight:800">'+pr.length+' pedido'+(pr.length>1?'s':'')+'</span>':'');
+    const verTodos=document.createElement('a');verTodos.textContent='Ver todos →';
+    verTodos.style.cssText='font-size:11px;color:var(--v);cursor:pointer;text-decoration:none;font-weight:700';
+    verTodos.onclick=e=>{e.preventDefault();nav('pedidos');};
+    cardTit.appendChild(titMain);cardTit.appendChild(verTodos);
+    card.appendChild(cardTit);
+    if(!pr.length){
+      const emp=document.createElement('div');emp.style.cssText='text-align:center;padding:16px;color:var(--ts);font-size:13px';
+      emp.innerHTML='✅ <strong>Nenhum pedido pendente</strong> — tudo em dia!';
+      card.appendChild(emp);
+    } else {
+      pr.forEach(p=>{
+        const row=document.createElement('div');
+        row.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:10px;margin-bottom:6px;background:var(--rf);border:1.5px solid var(--rb);gap:8px';
+        const left=document.createElement('div');left.style.cssText='flex:1;min-width:0';
+        const info=document.createElement('div');info.style.cssText='display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px';
+        const num=document.createElement('span');num.style.cssText='font-weight:800;color:var(--v);font-size:14px';num.textContent='#'+p.numero_pedido;
+        const dest=bq(UL[p.unidade]||p.unidade,UB[p.unidade]||'');
+        const dt=document.createElement('span');dt.style.cssText='font-size:11px;color:var(--ts)';
+        dt.textContent=new Date(p.data_pedido+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'short'});
+        info.appendChild(num);info.appendChild(dest);info.appendChild(dt);
+        const statusBadge=document.createElement('span');
+        statusBadge.style.cssText='font-size:11px;font-weight:700;padding:3px 10px;border-radius:50px;'+(p.status==='confirmado'?'background:#dcfce7;color:#166534;border:1px solid #86efac':'background:#fef3c7;color:#92400e;border:1px solid #fcd34d');
+        statusBadge.textContent=p.status==='confirmado'?'✅ Confirmado':'⏳ Aguardando Central';
+        left.appendChild(info);left.appendChild(statusBadge);
+        const right=document.createElement('div');right.style.cssText='display:flex;align-items:center;gap:6px;flex-shrink:0';
+        const sel=document.createElement('select');
+        sel.style.cssText='font-size:11px;font-family:Nunito,sans-serif;font-weight:700;padding:5px 8px;border-radius:8px;border:1.5px solid var(--rb);background:#fff;cursor:pointer';
+        const statuses={solicitado:'Solicitado',confirmado:'Confirmado',recebido_completo:'Recebido',recebido_divergencia:'Recebido c/ diverg.',cancelado:'Cancelado'};
+        Object.entries(statuses).forEach(([v,l])=>{const o=document.createElement('option');o.value=v;o.textContent=l;if(v===p.status)o.selected=true;sel.appendChild(o);});
+        sel.addEventListener('change',async e=>{
+          const ns=e.target.value;await db('lola_pedidos','PATCH',{status:ns},'?id=eq.'+p.id);p.status=ns;
+          if(ns!=='solicitado'&&ns!=='confirmado'){row.style.opacity='0.4';row.style.pointerEvents='none';setTimeout(()=>row.remove(),800);}
+        });
+        const bVer=btn('btn bg bsm','Ver',()=>verPedido(p));bVer.style.cssText='padding:5px 10px;font-size:11px;font-weight:700;border-radius:8px';
+        right.appendChild(sel);right.appendChild(bVer);
+        row.appendChild(left);row.appendChild(right);
+        card.appendChild(row);
+      });
+    }
     c.appendChild(card);
   }catch(e){c.innerHTML='<div style="padding:20px;color:red;font-weight:700">❌ Erro ao conectar com banco de dados.<br><small>Abra este arquivo no Chrome (não no preview do Claude)</small></div>';}
 }
@@ -1006,63 +1044,72 @@ function drawPP(w){
   const DEST_COR={ccmq:'#AA2B2B',mac:'#166534',central:'#1d4ed8',eventos:'#c47700'};
   const DEST_LBL={ccmq:'CCMQ',mac:'MAC',central:'Central',eventos:'Evento'};
 
-  w.appendChild(div('tw',mkTable(
-    ['Nome','Rende','Custo total','Custo/porcao','Venda central','Ultima edicao',''],
-    f.map(p=>{
-      const dataEd=p.editado_em?new Date(p.editado_em).toLocaleDateString('pt-BR'):'-';
-      const edInfo=div(null,[
-        el('div',null,p.editado_por||'-',{style:'font-size:12px;font-weight:600'}),
-        el('div','tss',dataEd,{style:'font-size:10px'}),
-      ]);
-      const numPorcoes=parseFloat(p.rendimento_qtd)&&parseFloat(p.porcao_qtd)?
-        (parseFloat(p.rendimento_qtd)/parseFloat(p.porcao_qtd)).toFixed(1):'—';
+  f.forEach(p=>{
+    const dataEd=p.editado_em?new Date(p.editado_em).toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}):null;
+    const numPorcoes=parseFloat(p.rendimento_qtd)&&parseFloat(p.porcao_qtd)?
+      (parseFloat(p.rendimento_qtd)/parseFloat(p.porcao_qtd)).toFixed(1):'—';
 
-      // Nome + selos inline
-      const nomeCell=document.createElement('div');
-      const nomeStrong=document.createElement('strong');
-      nomeStrong.textContent=p.nome;
-      nomeCell.appendChild(nomeStrong);
-      const selosRow=document.createElement('div');
-      selosRow.style.cssText='display:flex;gap:4px;flex-wrap:wrap;margin-top:4px';
+    const card=document.createElement('div');
+    card.style.cssText='background:#fff;border:1.5px solid var(--rb);border-radius:14px;padding:12px 14px;margin-bottom:10px';
+
+    // Linha 1: nome + badge revisar
+    const nomeWrap=document.createElement('div');nomeWrap.style.cssText='margin-bottom:6px';
+    const nomeStrong=document.createElement('strong');nomeStrong.style.cssText='font-size:14px';nomeStrong.textContent=p.nome;
+    nomeWrap.appendChild(nomeStrong);
+    if(p.revisar){
+      const rv2=document.createElement('span');rv2.style.cssText='margin-left:6px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:50px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;cursor:pointer';
+      rv2.textContent='\u26A0\uFE0F revisar';rv2.title=p.revisar_motivo||'';
+      rv2.addEventListener('click',e=>{e.stopPropagation();modalRevisarFicha('pp',p);});
+      nomeWrap.appendChild(rv2);
+    }
+    // Selos de destino
+    if((p.destinos||[]).length||p.e_preparo){
+      const selosRow=document.createElement('div');selosRow.style.cssText='display:flex;gap:4px;flex-wrap:wrap;margin-top:4px';
+      if(p.e_preparo){const s=document.createElement('span');s.style.cssText='font-size:10px;font-weight:800;padding:2px 8px;border-radius:50px;color:#fff;background:#7c3aed';s.textContent='Preparo';selosRow.appendChild(s);}
       (p.destinos||[]).forEach(d=>{
         const s=document.createElement('span');
         s.style.cssText='font-size:10px;font-weight:800;padding:2px 8px;border-radius:50px;color:#fff;background:'+(DEST_COR[d]||'#888');
-        s.textContent=DEST_LBL[d]||d;
-        selosRow.appendChild(s);
+        s.textContent=DEST_LBL[d]||d;selosRow.appendChild(s);
       });
-      if(p.e_preparo){
-        const s=document.createElement('span');
-        s.style.cssText='font-size:10px;font-weight:800;padding:2px 8px;border-radius:50px;color:#fff;background:#7c3aed';
-        s.textContent='🔄 Pré-preparo';
-        selosRow.appendChild(s);
-      }
-      if(p.revisar){const rv2=document.createElement('span');rv2.style.cssText='margin-left:6px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:50px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;cursor:pointer';rv2.textContent='⚠️ revisar';rv2.title=p.revisar_motivo||'';rv2.addEventListener('click',e=>{e.stopPropagation();modalRevisarFicha('pp',p);});nomeCell.appendChild(rv2);}
-      if((p.destinos||[]).length||p.e_preparo) nomeCell.appendChild(selosRow);
+      nomeWrap.appendChild(selosRow);
+    }
+    card.appendChild(nomeWrap);
 
-      return[
-        nomeCell,
-        N(p.rendimento_qtd,0)+' '+(p.rendimento_un||''),
-        el('span','bold tv',R(p.custo_total)),
-        el('span','bold',R(p.custo_por_unidade)),
-        p.valor_venda_central?el('span','bold',R(p.valor_venda_central)):span('tss','—'),
-        edInfo,
-        (()=>{
-          const wrap=div('fl_ gap2');
-          const bMk2=btn('btn bg bsm',p.revisar?'⚠️ Revisar':'⚠️',()=>modalRevisarFicha('pp',p));
-          if(p.revisar){bMk2.style.cssText='padding:3px 8px;border-radius:50px;background:#fef3c7;color:#92400e;font-size:11px;font-weight:700;border:1.5px solid #fcd34d;white-space:nowrap;cursor:pointer';}
-          bMk2.title=p.revisar?p.revisar_motivo||'':'Marcar para revisar';
-          wrap.appendChild(bMk2);
-          wrap.appendChild(btn('btn bg bsm','📋',()=>verFichaPrep(p)));
-          wrap.appendChild(btn('btn bg bsm','✏️',()=>modalPrep(p)));
-          wrap.appendChild(btn('btn bd bsm','🗑',async()=>{if(!confirm('Excluir "'+p.nome+'"?'))return;await db('lola_preproducoes','PATCH',{ativo:false},'?id=eq.'+p.id);_pp=await db('lola_preproducoes','GET',null,'?select=*&ativo=eq.true&order=nome.asc');drawPP($('#pp-t'));}));
-          return wrap;
-        })()
-      ];
-    }),
-    [null,null,'tr','tr','tr',null,null],
-    true
-  )));
+    // Linha 2: dados principais
+    const l2=document.createElement('div');l2.style.cssText='display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px';
+    function mkInfo(lbl,val,cor){
+      const d=document.createElement('div');
+      const lt=document.createElement('div');lt.style.cssText='font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:1px';lt.textContent=lbl;
+      const vt=document.createElement('div');vt.style.cssText='font-size:13px;font-weight:700'+(cor?';color:'+cor:'');vt.textContent=val;
+      d.appendChild(lt);d.appendChild(vt);return d;
+    }
+    const rendStr=N(p.rendimento_qtd,0)+(p.rendimento_un?' '+p.rendimento_un:'')+(numPorcoes!=='—'?' ('+numPorcoes+' por\u00E7\u00F5es)':'');
+    l2.appendChild(mkInfo('Rende',rendStr));
+    l2.appendChild(mkInfo('Custo total',R(p.custo_total)));
+    l2.appendChild(mkInfo('Custo/por\u00E7\u00E3o',R(p.custo_por_unidade),'var(--v)'));
+    if(p.valor_venda_central&&parseFloat(p.valor_venda_central)>0)l2.appendChild(mkInfo('Venda central',R(p.valor_venda_central)));
+    if(dataEd)l2.appendChild(mkInfo('Editado',(p.editado_por||'\u2014')+' \u00B7 '+dataEd));
+    card.appendChild(l2);
+
+    // Linha 3: botões
+    const btns=document.createElement('div');btns.style.cssText='display:flex;gap:6px;flex-wrap:wrap;align-items:center';
+    const bMk2=btn('btn bg bsm',p.revisar?'\u26A0\uFE0F Revisar':'\u26A0\uFE0F',()=>modalRevisarFicha('pp',p));
+    if(p.revisar){bMk2.style.cssText='padding:3px 8px;border-radius:50px;background:#fef3c7;color:#92400e;font-size:11px;font-weight:700;border:1.5px solid #fcd34d;white-space:nowrap;cursor:pointer';}
+    bMk2.title=p.revisar?p.revisar_motivo||'':'Marcar para revisar';
+    btns.appendChild(bMk2);
+    btns.appendChild(btn('btn bg bsm','\u{1F4CB}',()=>verFichaPrep(p)));
+    btns.appendChild(btn('btn bg bsm','\u270F\uFE0F',()=>modalPrep(p)));
+    btns.appendChild(btn('btn bd bsm','\u{1F5D1}',async()=>{
+      if(!confirm('Excluir "'+p.nome+'"?'))return;
+      await db('lola_preproducoes','PATCH',{ativo:false},'?id=eq.'+p.id);
+      _pp=await db('lola_preproducoes','GET',null,'?select=*&ativo=eq.true&order=nome.asc');
+      drawPP($('#pp-t'));
+    }));
+    card.appendChild(btns);
+    w.appendChild(card);
+  });
 }
+
 
 async function pgPreps(c){
   c.appendChild(ld());
@@ -1464,7 +1511,7 @@ function drawFT(w){
     card.style.cssText='background:#fff;border:1.5px solid var(--rb);border-radius:14px;padding:12px 14px;margin-bottom:10px'+((!semPreco&&mg<0)?';border-color:#fca5a5;background:#fff5f5':(!semPreco&&mg<30)?';border-color:#fcd34d;background:#fffbeb':'');
 
     // Linha 1: nome + badge revisar
-    const l1=document.createElement('div');l1.style.cssText='display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px';
+    const l1=document.createElement('div');l1.style.cssText='display:flex;align-items:flex-start;gap:8px;margin-bottom:6px';
     const nomeWrap=document.createElement('div');nomeWrap.style.cssText='flex:1;min-width:0';
     const nomeStrong=document.createElement('strong');nomeStrong.style.cssText='font-size:14px;display:block';nomeStrong.textContent=x.nome;
     nomeWrap.appendChild(nomeStrong);
@@ -1486,12 +1533,6 @@ function drawFT(w){
     }
     l1.appendChild(nomeWrap);
 
-    // Margem em destaque
-    if(!semPreco){
-      const mgEl=mkMargem(x.preco_venda,x.custo_por_porcao);
-      mgEl.style&&(mgEl.style.flexShrink='0');
-      l1.appendChild(mgEl);
-    }
     card.appendChild(l1);
 
     // Linha 2: custos
@@ -1503,7 +1544,14 @@ function drawFT(w){
       d.appendChild(lt);d.appendChild(vt);return d;
     }
     l2.appendChild(mkInfo('Custo/porção',R(x.custo_por_porcao),'var(--v)'));
-    if(!semPreco) l2.appendChild(mkInfo('Preço venda',R(x.preco_venda)));
+    if(!semPreco){
+      l2.appendChild(mkInfo('Preço venda',R(x.preco_venda)));
+      const mgWrap=document.createElement('div');
+      const mgLbl=document.createElement('div');mgLbl.style.cssText='font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:1px';mgLbl.textContent='Margem';
+      const mgVal=mkMargem(x.preco_venda,x.custo_por_porcao);
+      mgWrap.appendChild(mgLbl);mgWrap.appendChild(mgVal);
+      l2.appendChild(mgWrap);
+    }
     if(dataEd) l2.appendChild(mkInfo('Editado',( x.editado_por||'—')+' · '+dataEd));
     card.appendChild(l2);
 
@@ -2352,7 +2400,9 @@ async function pgSaidas(c){
       c.appendChild(hdr);
 
       // Tabela dos itens do dia
-      c.appendChild(div('tw mb3',mkTable(
+      const twSaidas=div('tw mb3');
+      c.appendChild(twSaidas);
+      twSaidas.appendChild(mkTable(
         ['Item','Categoria','Qtd','Un','Destino','Responsável',''],
         dItens.map((it,_si)=>{
           const cat=it.lola_estoque_itens?.categoria;
@@ -2380,7 +2430,7 @@ async function pgSaidas(c){
           ];
         }),
         [null,null,'tr','tr',null,null,null]
-      )));
+      ));
     });
   }catch(e){c.innerHTML='<p style="color:red;padding:20px">'+e.message+'</p>';}
 }
