@@ -1455,54 +1455,76 @@ function drawFT(w){
   const DEST_COR={ccmq:'#AA2B2B',mac:'#166534',eventos:'#c47700'};
   const DEST_LBL={ccmq:'CCMQ',mac:'MAC',eventos:'Evento'};
 
-  w.appendChild(div('tw',mkTable(
-    ['Prato','Custo/porcao','Preco venda','Margem','Ultima edicao',''],
-    f.map(x=>{
-      const semPreco=!x.preco_venda||x.preco_venda<=0;
-      const mg=semPreco?null:((x.preco_venda-x.custo_por_porcao)/x.preco_venda*100);
-      const rowStyle=(!semPreco&&mg<0)?'background:#fff5f5':(!semPreco&&mg<30)?'background:#fffbeb':'';
-      const dataEd2=x.editado_em?new Date(x.editado_em).toLocaleDateString('pt-BR'):'-';
-      const edInfo2=div(null,[
-        el('div',null,x.editado_por||'-',{style:'font-size:12px;font-weight:600'}),
-        el('div','tss',dataEd2,{style:'font-size:10px'}),
-      ]);
-      const nomeCell=document.createElement('div');
-      const nomeStrong=document.createElement('strong');
-      nomeStrong.textContent=x.nome;
-      nomeCell.appendChild(nomeStrong);
-      if(x.revisar){const rv=document.createElement('span');rv.style.cssText='margin-left:6px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:50px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;cursor:pointer';rv.textContent='⚠️ revisar';rv.title=x.revisar_motivo||'';rv.addEventListener('click',e=>{e.stopPropagation();modalRevisarFicha('ft',x);});nomeCell.appendChild(rv);}
-      const selosRow=document.createElement('div');
-      selosRow.style.cssText='display:flex;gap:4px;flex-wrap:wrap;margin-top:4px';
+  f.forEach(x=>{
+    const semPreco=!x.preco_venda||x.preco_venda<=0;
+    const mg=semPreco?null:((x.preco_venda-x.custo_por_porcao)/x.preco_venda*100);
+    const dataEd=x.editado_em?new Date(x.editado_em).toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}):null;
+
+    const card=document.createElement('div');
+    card.style.cssText='background:#fff;border:1.5px solid var(--rb);border-radius:14px;padding:12px 14px;margin-bottom:10px'+((!semPreco&&mg<0)?';border-color:#fca5a5;background:#fff5f5':(!semPreco&&mg<30)?';border-color:#fcd34d;background:#fffbeb':'');
+
+    // Linha 1: nome + badge revisar
+    const l1=document.createElement('div');l1.style.cssText='display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px';
+    const nomeWrap=document.createElement('div');nomeWrap.style.cssText='flex:1;min-width:0';
+    const nomeStrong=document.createElement('strong');nomeStrong.style.cssText='font-size:14px;display:block';nomeStrong.textContent=x.nome;
+    nomeWrap.appendChild(nomeStrong);
+    if(x.revisar){
+      const rv=document.createElement('span');rv.style.cssText='display:inline-block;margin-top:3px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:50px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;cursor:pointer';
+      rv.textContent='\u26a0\uFE0F revisar';rv.title=x.revisar_motivo||'';
+      rv.addEventListener('click',e=>{e.stopPropagation();modalRevisarFicha('ft',x);});
+      nomeWrap.appendChild(rv);
+    }
+    // Selos de destino
+    if((x.destinos||[]).length){
+      const selosRow=document.createElement('div');selosRow.style.cssText='display:flex;gap:4px;flex-wrap:wrap;margin-top:4px';
       (x.destinos||[]).forEach(d=>{
         const s=document.createElement('span');
         s.style.cssText='font-size:10px;font-weight:800;padding:2px 8px;border-radius:50px;color:#fff;background:'+(DEST_COR[d]||'#888');
-        s.textContent=DEST_LBL[d]||d;
-        selosRow.appendChild(s);
+        s.textContent=DEST_LBL[d]||d;selosRow.appendChild(s);
       });
-      if((x.destinos||[]).length) nomeCell.appendChild(selosRow);
-      return{cells:[
-        nomeCell,
-        el('span','bold tv',R(x.custo_por_porcao)),
-        semPreco?span('tss','sem preco'):el('span','bold',R(x.preco_venda)),
-        mkMargem(x.preco_venda,x.custo_por_porcao),
-        edInfo2,
-        (()=>{
-          const wrap=div('fl_ gap2');
-          const bMk=btn('btn bg bsm',x.revisar?'⚠️ Revisar':'⚠️',()=>modalRevisarFicha('ft',x));
-          if(x.revisar){bMk.style.cssText='padding:3px 8px;border-radius:50px;background:#fef3c7;color:#92400e;font-size:11px;font-weight:700;border:1.5px solid #fcd34d;white-space:nowrap;cursor:pointer';}
-          bMk.title=x.revisar?x.revisar_motivo||'':'Marcar para revisar';
-          wrap.appendChild(bMk);
-          wrap.appendChild(btn('btn bg bsm','📋',()=>verFichaFT(x)));
-          wrap.appendChild(btn('btn bg bsm','✏️',()=>modalFicha(x)));
-          const del=btn('btn bd bsm','🗑',async()=>{if(!confirm('Excluir '+x.nome+'?'))return;await db('lola_fichas_tecnicas','PATCH',{ativo:false},'?id=eq.'+x.id);_ft=await db('lola_fichas_tecnicas','GET',null,'?select=*&ativo=eq.true&order=nome.asc');drawFT($('#ft-t'));});
-          wrap.appendChild(del);
-          return wrap;
-        })()
-      ],style:rowStyle};
-    }),
-    [null,'tr','tr',null,null,null],
-    true
-  )));
+      nomeWrap.appendChild(selosRow);
+    }
+    l1.appendChild(nomeWrap);
+
+    // Margem em destaque
+    if(!semPreco){
+      const mgEl=mkMargem(x.preco_venda,x.custo_por_porcao);
+      mgEl.style&&(mgEl.style.flexShrink='0');
+      l1.appendChild(mgEl);
+    }
+    card.appendChild(l1);
+
+    // Linha 2: custos
+    const l2=document.createElement('div');l2.style.cssText='display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px';
+    function mkInfo(lbl,val,cor){
+      const d=document.createElement('div');
+      const lt=document.createElement('div');lt.style.cssText='font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:1px';lt.textContent=lbl;
+      const vt=document.createElement('div');vt.style.cssText='font-size:13px;font-weight:700'+(cor?';color:'+cor:'');vt.textContent=val;
+      d.appendChild(lt);d.appendChild(vt);return d;
+    }
+    l2.appendChild(mkInfo('Custo/porção',R(x.custo_por_porcao),'var(--v)'));
+    if(!semPreco) l2.appendChild(mkInfo('Preço venda',R(x.preco_venda)));
+    if(dataEd) l2.appendChild(mkInfo('Editado',( x.editado_por||'—')+' · '+dataEd));
+    card.appendChild(l2);
+
+    // Linha 3: botões
+    const btns=document.createElement('div');btns.style.cssText='display:flex;gap:6px;flex-wrap:wrap;align-items:center';
+    const bMk=btn('btn bg bsm',x.revisar?'\u26a0\uFE0F Revisar':'\u26a0\uFE0F',()=>modalRevisarFicha('ft',x));
+    if(x.revisar){bMk.style.cssText='padding:3px 8px;border-radius:50px;background:#fef3c7;color:#92400e;font-size:11px;font-weight:700;border:1.5px solid #fcd34d;white-space:nowrap;cursor:pointer';}
+    bMk.title=x.revisar?x.revisar_motivo||'':'Marcar para revisar';
+    btns.appendChild(bMk);
+    btns.appendChild(btn('btn bg bsm','\u{1F4CB}',()=>verFichaFT(x)));
+    btns.appendChild(btn('btn bg bsm','\u270F\uFE0F',()=>modalFicha(x)));
+    const del=btn('btn bd bsm','\u{1F5D1}',async()=>{
+      if(!confirm('Excluir '+x.nome+'?'))return;
+      await db('lola_fichas_tecnicas','PATCH',{ativo:false},'?id=eq.'+x.id);
+      _ft=await db('lola_fichas_tecnicas','GET',null,'?select=*&ativo=eq.true&order=nome.asc');
+      drawFT($('#ft-t'));
+    });
+    btns.appendChild(del);
+    card.appendChild(btns);
+    w.appendChild(card);
+  });
 }
 
 async function pgFichas(c){
