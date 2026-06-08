@@ -71,6 +71,8 @@ td .sub{font-size:10px;color:var(--ts);margin-top:2px;}
 .bca{background:#fee2e2;color:#dc2626;font-weight:800;}
 .brec{background:#dcfce7;color:#166534;font-weight:800;}
 .bdiv{background:#fef3c7;color:#92400e;font-weight:800;}
+.bprod{background:#dbeafe;color:#1d4ed8;font-weight:800;}
+.bpronto{background:#fef3c7;color:#92400e;font-weight:800;}
 .ben{background:#dcfce7;color:#166534;}
 .bct{background:var(--rt);color:var(--v);}
 /* FORM */
@@ -173,7 +175,7 @@ const DBR=d=>d?new Date(d+'T12:00:00').toLocaleDateString('pt-BR'):'-';
 
 const UL={ccmq:'CCMQ',mac:'Mac',central:'Central',eventos:'Eventos'};
 const UB={ccmq:'bc',mac:'bm',central:'bce',eventos:'bev'};
-const SBS={rascunho:'bct',solicitado:'bsol',confirmado:'bconf',entregue:'bent',cancelado:'bca',recebido_completo:'brec',recebido_divergencia:'bdiv'};
+const SBS={rascunho:'bct',em_producao:'bprod',pronto_entrega:'bpronto',recebido_completo:'brec',recebido_divergencia:'bdiv',cancelado:'bca',solicitado:'bprod',confirmado:'bpronto',entregue:'bent'};
 
 let PAGE='dashboard';
 let _ins=[],_pp=[],_ft=[],_cat=[];
@@ -368,9 +370,9 @@ async function pgDash(c){
     const[ai,af,ap,ar,pr,uc,rv_ft,rv_pp]=await Promise.all([
       db('lola_insumos','GET',null,'?select=id&ativo=eq.true'),
       db('lola_fichas_tecnicas','GET',null,'?select=id&ativo=eq.true'),
-      db('lola_pedidos','GET',null,'?select=id&status=eq.solicitado'),
+      db('lola_pedidos','GET',null,'?select=id&status=in.(em_producao,pronto_entrega)'),
       db('lola_preproducoes','GET',null,'?select=id&ativo=eq.true'),
-      db('lola_pedidos','GET',null,'?select=*&order=created_at.desc&limit=6'),
+      db('lola_pedidos','GET',null,'?select=*&status=in.(em_producao,pronto_entrega,solicitado,confirmado)&order=data_pedido.asc'),
       db('lola_contagens','GET',null,'?order=data_contagem.desc&limit=3'),
       db('lola_fichas_tecnicas','GET',null,'?select=id,nome&ativo=eq.true&revisar=eq.true'),
       db('lola_preproducoes','GET',null,'?select=id,nome&ativo=eq.true&revisar=eq.true'),
@@ -379,7 +381,7 @@ async function pgDash(c){
     c.appendChild(div('g3',[
       mkStat('🧂','Insumos',ai.length,'ingredientes ativos'),
       mkStat('🍳','Pré-produções',ar.length,'preparos mapeados'),
-      mkStat('🛒','Pedidos solicitados',ap.length,'aguardando Central',ap.length>0?'var(--v)':'var(--vd)'),
+      mkStat('🛒','Em produção',ap.length,'aguardando Central',ap.length>0?'var(--v)':'var(--vd)'),
     ]));
     if((rv_ft||[]).length+(rv_pp||[]).length>0){
       const tot=(rv_ft||[]).length+(rv_pp||[]).length;
@@ -439,17 +441,19 @@ async function pgDash(c){
         dt.textContent=new Date(p.data_pedido+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'short'});
         info.appendChild(num);info.appendChild(dest);info.appendChild(dt);
         const statusBadge=document.createElement('span');
-        statusBadge.style.cssText='font-size:11px;font-weight:700;padding:3px 10px;border-radius:50px;'+(p.status==='confirmado'?'background:#dcfce7;color:#166534;border:1px solid #86efac':'background:#fef3c7;color:#92400e;border:1px solid #fcd34d');
-        statusBadge.textContent=p.status==='confirmado'?'✅ Confirmado':'⏳ Aguardando Central';
+        const isReady=p.status==='pronto_entrega'||p.status==='confirmado';
+        statusBadge.style.cssText='font-size:11px;font-weight:700;padding:3px 10px;border-radius:50px;'+(isReady?'background:#dcfce7;color:#166534;border:1px solid #86efac':'background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd');
+        const statusLabels={em_producao:'🔄 Em produção',pronto_entrega:'📦 Pronto para entrega',solicitado:'🔄 Em produção',confirmado:'📦 Pronto para entrega'};
+        statusBadge.textContent=statusLabels[p.status]||p.status;
         left.appendChild(info);left.appendChild(statusBadge);
         const right=document.createElement('div');right.style.cssText='display:flex;align-items:center;gap:6px;flex-shrink:0';
         const sel=document.createElement('select');
         sel.style.cssText='font-size:11px;font-family:Nunito,sans-serif;font-weight:700;padding:5px 8px;border-radius:8px;border:1.5px solid var(--rb);background:#fff;cursor:pointer';
-        const statuses={solicitado:'Solicitado',confirmado:'Confirmado',recebido_completo:'Recebido',recebido_divergencia:'Recebido c/ diverg.',cancelado:'Cancelado'};
+        const statuses={em_producao:'Em produção',pronto_entrega:'Pronto para entrega',recebido_completo:'Recebido completo',recebido_divergencia:'Recebido c/ diverg.',cancelado:'Cancelado'};
         Object.entries(statuses).forEach(([v,l])=>{const o=document.createElement('option');o.value=v;o.textContent=l;if(v===p.status)o.selected=true;sel.appendChild(o);});
         sel.addEventListener('change',async e=>{
           const ns=e.target.value;await db('lola_pedidos','PATCH',{status:ns},'?id=eq.'+p.id);p.status=ns;
-          if(ns!=='solicitado'&&ns!=='confirmado'){row.style.opacity='0.4';row.style.pointerEvents='none';setTimeout(()=>row.remove(),800);}
+          if(ns!=='em_producao'&&ns!=='pronto_entrega'){row.style.opacity='0.4';row.style.pointerEvents='none';setTimeout(()=>row.remove(),800);}
         });
         const bVer=btn('btn bg bsm','Ver',()=>verPedido(p));bVer.style.cssText='padding:5px 10px;font-size:11px;font-weight:700;border-radius:8px';
         right.appendChild(sel);right.appendChild(bVer);
@@ -3616,12 +3620,14 @@ function drawPed(w){
       // Select de status com cor dinâmica
       const STATUS_COLORS={
         rascunho:'background:#f1f5f9;color:#64748b',
-        solicitado:'background:#dcfce7;color:#166534',
-        confirmado:'background:#dbeafe;color:#1d4ed8',
-        entregue:'background:#f3e8ff;color:#7c3aed',
-        cancelado:'background:#fee2e2;color:#dc2626',
+        em_producao:'background:#dbeafe;color:#1d4ed8',
+        pronto_entrega:'background:#fef3c7;color:#92400e',
         recebido_completo:'background:#dcfce7;color:#166534',
         recebido_divergencia:'background:#fef3c7;color:#92400e',
+        cancelado:'background:#fee2e2;color:#dc2626',
+        solicitado:'background:#dbeafe;color:#1d4ed8',
+        confirmado:'background:#fef3c7;color:#92400e',
+        entregue:'background:#f3e8ff;color:#7c3aed',
       };
       // Rascunho: mostrar badge simples sem select (não pode mudar status)
       let statusEl;
@@ -3633,8 +3639,8 @@ function drawPed(w){
           sel.style.cssText='padding:6px 12px;font-size:12px;font-weight:700;border-radius:50px;border:none;cursor:pointer;font-family:Nunito,sans-serif;min-width:130px;'+(STATUS_COLORS[status]||'');
         }
         applySelStyle(p.status);
-        ['solicitado','confirmado','recebido_completo','recebido_divergencia','entregue','cancelado'].forEach(s=>{
-          const o=document.createElement('option');o.value=s;o.textContent={rascunho:'Rascunho',solicitado:'Solicitado',confirmado:'Confirmado',entregue:'Entregue',cancelado:'Cancelado',recebido_completo:'Recebido completo',recebido_divergencia:'Recebido c/ diverg.'}[s]||s;
+        ['em_producao','pronto_entrega','recebido_completo','recebido_divergencia','cancelado'].forEach(s=>{
+          const o=document.createElement('option');o.value=s;o.textContent={em_producao:'Em produção',pronto_entrega:'Pronto para entrega',recebido_completo:'Recebido completo',recebido_divergencia:'Recebido c/ diverg.',cancelado:'Cancelado',solicitado:'Em produção',confirmado:'Pronto para entrega',entregue:'Entregue'}[s]||s;
           if(s===p.status)o.selected=true;sel.appendChild(o);
         });
         sel.addEventListener('change',async e=>{
@@ -3665,7 +3671,7 @@ function drawPed(w){
               drawPed($('#ped-t'));
             });
             wrap.appendChild(envBtn);
-          } else if(p.status==='solicitado'||p.status==='confirmado'){
+          } else if(p.status==='em_producao'||p.status==='pronto_entrega'||p.status==='solicitado'||p.status==='confirmado'){
             wrap.appendChild(btn('btn bo bsm','📥 Receber',()=>registrarRecebimento(p)));
             wrap.appendChild(btn('btn bo bsm no-print','🖨️',()=>imprimirPed(p)));
           } else if(p.status==='recebido_divergencia'){
@@ -3778,7 +3784,7 @@ async function pgPed(c){
     const barraTopo=div('fl_ jb aic');
     const tabsGrupo=div('fl_ gap2 aic');
     const tabsEl=div('tabs');
-    [{k:'todos',l:'Todos'},{k:'rascunho',l:'Rascunhos'},{k:'ccmq',l:'CCMQ'},{k:'mac',l:'Mac'},{k:'terceiro',l:'Terceiros'},{k:'solicitado',l:'Solicitados'},{k:'entregue',l:'Entregues'}]
+    [{k:'todos',l:'Todos'},{k:'rascunho',l:'Rascunhos'},{k:'ccmq',l:'CCMQ'},{k:'mac',l:'Mac'},{k:'terceiro',l:'Terceiros'},{k:'em_producao',l:'Em produção'},{k:'pronto_entrega',l:'Pronto p/ entrega'}]
       .forEach(t=>{const p=span('tp'+(_pedTab===t.k?' active':''),t.l);p.addEventListener('click',()=>{_pedTab=t.k;drawPed($('#ped-t'));});tabsEl.appendChild(p);});
     tabsGrupo.appendChild(tabsEl);
     barraTopo.appendChild(tabsGrupo);
