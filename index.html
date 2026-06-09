@@ -3563,7 +3563,7 @@ async function verDivergencias(p,divs,data,resp){
   let divergencias=divs;
   if(!divergencias){
     const receb=await db('lola_pedidos_recebimentos','GET',null,'?pedido_id=eq.'+p.id+'&order=created_at.desc&limit=1');
-    if(!receb.length)return;
+    if(!receb.length){registrarRecebimento(p);return;}
     const itens=await db('lola_pedidos_recebimentos_itens','GET',null,'?recebimento_id=eq.'+receb[0].id+'&select=*');
     divergencias=itens.filter(it=>parseFloat(it.qtd_recebida)!==parseFloat(it.qtd_solicitada)).map(it=>({item:{nome_item:it.nome_item,quantidade:it.qtd_solicitada,unidade:it.unidade},qtdRecebida:it.qtd_recebida}));
     data=receb[0].data_recebimento;resp=receb[0].recebido_por;
