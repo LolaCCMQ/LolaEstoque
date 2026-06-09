@@ -163,6 +163,11 @@ td .sub{font-size:10px;color:var(--ts);margin-top:2px;}
 .recv-modal .mh{flex:0 0 auto}
 .recv-modal .mb{flex:1 1 auto;min-height:0;overflow-y:auto}
 .recv-modal .mf{flex:0 0 auto}
+/* Pedidos: resumo compacto e abaixo da lista */
+#ped-resumo{margin-top:16px}
+#ped-resumo .scv{font-size:17px!important}
+#ped-resumo .sc{padding:10px 14px!important}
+#ped-resumo .scl{font-size:9px!important}
 /* Recebimento: tabela cabe no celular */
 @media (max-width:560px){
   .recv-modal table{table-layout:fixed;width:100%}
@@ -3838,9 +3843,9 @@ async function pgPed(c){
 
     // Resumo financeiro do período
     const resumoEl=div('',null,{id:'ped-resumo'});
-    c.appendChild(resumoEl);
     const w=div(null,null,{id:'ped-t'});
     c.appendChild(w);
+    c.appendChild(resumoEl);
 
     function atualizaResumo(){
       const base=_pedMes?_peds.filter(p=>p.data_pedido?.startsWith(_pedMes)):_peds;
