@@ -3812,8 +3812,8 @@ async function pgPed(c){
 
     function atualizaResumo(){
       const base=_pedMes?_peds.filter(p=>p.data_pedido?.startsWith(_pedMes)):_peds;
-      // Contar apenas pedidos ENTREGUES no resumo financeiro
-      const entregues=base.filter(p=>p.status==='entregue');
+      // Contar pedidos RECEBIDOS (completo + com divergencia) no resumo financeiro
+      const entregues=base.filter(p=>p.status==='recebido_completo'||p.status==='recebido_divergencia');
       const totCCMQ=entregues.filter(p=>p.unidade==='ccmq').reduce((t,p)=>t+parseFloat(p.valor_total||0),0);
       const totMAC=entregues.filter(p=>p.unidade==='mac').reduce((t,p)=>t+parseFloat(p.valor_total||0),0);
       const totTerc=entregues.filter(p=>p.unidade==='terceiro').reduce((t,p)=>t+parseFloat(p.valor_total||0),0);
@@ -3829,21 +3829,21 @@ async function pgPed(c){
         div('sc',[
           span('scl','CCMQ — '+label.toUpperCase()),
           div('scv',R(totCCMQ)),
-          span('scs',nCCMQ+' pedido'+(nCCMQ!==1?'s':'')+' entregues'),
+          span('scs',nCCMQ+' pedido'+(nCCMQ!==1?'s':'')+' recebidos'),
         ]),
         div('sc',[
           span('scl','MAC — '+label.toUpperCase()),
           el('div','scv tvd',R(totMAC)),
-          span('scs',nMAC+' pedido'+(nMAC!==1?'s':'')+' entregues'),
+          span('scs',nMAC+' pedido'+(nMAC!==1?'s':'')+' recebidos'),
         ]),
         div('sc',[
           span('scl','TERCEIROS — '+label.toUpperCase()),
           el('div','scv',R(totTerc),{style:'color:var(--am)'}),
-          span('scs',nTerc+' pedido'+(nTerc!==1?'s':'')+' entregues'),
+          span('scs',nTerc+' pedido'+(nTerc!==1?'s':'')+' recebidos'),
         ]),
       ]);
       const infoEl=div(null);
-      infoEl.appendChild(el('span','bold',_pedMes?'Total entregue no período:':'Total entregue (geral):',{style:'font-size:14px'}));
+      infoEl.appendChild(el('span','bold',_pedMes?'Total recebido no período:':'Total recebido (geral):',{style:'font-size:14px'}));
       if(nPend>0) infoEl.appendChild(el('span','tss',' · '+nPend+' pedido'+(nPend!==1?'s':'')+' ainda em aberto',{style:'font-size:11px;margin-left:8px'}));
       const tot=div('card mb3 fl_ jb aic',[
         infoEl,
