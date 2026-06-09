@@ -53,6 +53,15 @@ body{font-family:'Nunito',sans-serif;background:var(--rf);color:var(--tx);min-he
 table{width:100%;border-collapse:collapse;}
 thead th{padding:10px 14px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--v);background:var(--rt);font-weight:800;border-bottom:1.5px solid var(--rb);white-space:nowrap;}
 thead th.tr{text-align:right;}
+.tbl-saidas{table-layout:fixed;}
+.tbl-saidas th,.tbl-saidas td{white-space:normal;overflow:hidden;text-overflow:ellipsis;}
+.tbl-saidas th:nth-child(1),.tbl-saidas td:nth-child(1){width:18%}
+.tbl-saidas th:nth-child(2),.tbl-saidas td:nth-child(2){width:22%}
+.tbl-saidas th:nth-child(3),.tbl-saidas td:nth-child(3){width:8%}
+.tbl-saidas th:nth-child(4),.tbl-saidas td:nth-child(4){width:7%}
+.tbl-saidas th:nth-child(5),.tbl-saidas td:nth-child(5){width:14%}
+.tbl-saidas th:nth-child(6),.tbl-saidas td:nth-child(6){width:17%}
+.tbl-saidas th:nth-child(7),.tbl-saidas td:nth-child(7){width:14%}
 tbody tr{border-bottom:1px solid var(--rf);transition:background .1s;}
 tbody tr:last-child{border-bottom:none;}
 tbody tr:hover{background:var(--rf);}
@@ -2411,7 +2420,7 @@ async function pgSaidas(c){
       // Tabela dos itens do dia
       const twSaidas=div('tw mb3');
       c.appendChild(twSaidas);
-      twSaidas.appendChild(mkTable(
+      const tblS=mkTable(
         ['Item','Categoria','Qtd','Un','Destino','Responsável',''],
         dItens.map((it,_si)=>{
           const cat=it.lola_estoque_itens?.categoria;
@@ -2439,7 +2448,9 @@ async function pgSaidas(c){
           ];
         }),
         [null,null,'tr','tr',null,null,null]
-      ));
+      );
+      tblS.classList.add('tbl-saidas');
+      twSaidas.appendChild(tblS);
     });
   }catch(e){c.innerHTML='<p style="color:red;padding:20px">'+e.message+'</p>';}
 }
