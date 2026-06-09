@@ -4438,7 +4438,7 @@ async function imprimirPed(ped){
       <td style="padding:9px 11px;text-align:center;font-size:12px">${it.unidade||''}</td>
       <td style="padding:9px 11px;text-align:center;font-size:12px">${N(it.quantidade,2)}</td>
       <td style="padding:9px 11px;text-align:right;font-size:12px">${R(it.preco_unitario)}</td>
-      <td style="padding:9px 11px;text-align:right;font-size:12px;font-weight:700;color:#AA2B2B">${R(it.subtotal)}</td>
+      <td style="padding:9px 11px;text-align:right;font-size:12px;font-weight:700;color:#AA2B2B">${R((parseFloat(it.quantidade)||0)*(parseFloat(it.preco_unitario)||0))}</td>
     </tr>`).join('');
   const area=div(null,null,{html:`
     <div style="text-align:center;margin-bottom:18px;border-bottom:2px solid #AA2B2B;padding-bottom:14px">
@@ -4464,7 +4464,7 @@ async function imprimirPed(ped){
       <tfoot>
         <tr style="border-top:2px solid #AA2B2B">
           <td colspan="4" style="padding:12px;text-align:right;font-weight:800;font-size:15px">TOTAL</td>
-          <td style="padding:12px;text-align:right;font-weight:900;font-size:20px;color:#AA2B2B">${R(ped.valor_total)}</td>
+          <td style="padding:12px;text-align:right;font-weight:900;font-size:20px;color:#AA2B2B">${R(itens.reduce((s,x)=>s+(parseFloat(x.quantidade)||0)*(parseFloat(x.preco_unitario)||0),0))}</td>
         </tr>
       </tfoot>
     </table>
