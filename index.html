@@ -378,11 +378,12 @@ async function pgDash(c){
       db('lola_preproducoes','GET',null,'?select=id,nome&ativo=eq.true&revisar=eq.true'),
     ]);
     c.innerHTML='';
-    c.appendChild(div('g3',[
+    let fichasEl=null, contagensEl=null;
+    const statsEl=div('g3',[
       mkStat('🧂','Insumos',ai.length,'ingredientes ativos'),
       mkStat('🍳','Pré-produções',ar.length,'preparos mapeados'),
       mkStat('🛒','Em produção',ap.length,'aguardando Central',ap.length>0?'var(--v)':'var(--vd)'),
-    ]));
+    ]);
     if((rv_ft||[]).length+(rv_pp||[]).length>0){
       const tot=(rv_ft||[]).length+(rv_pp||[]).length;
       const alRev=document.createElement('div');
@@ -396,7 +397,7 @@ async function pgDash(c){
       if((rv_ft||[]).length)alR.appendChild(btn('btn bo bsm','Fichas Técnicas',()=>nav('fichas')));
       if((rv_pp||[]).length)alR.appendChild(btn('btn bo bsm','Pré-produções',()=>nav('preproducoes')));
       alRev.appendChild(alL);alRev.appendChild(alR);
-      c.appendChild(alRev);
+      fichasEl=alRev;
     }
     // Últimas contagens
     if(uc.length){
@@ -411,7 +412,7 @@ async function pgDash(c){
         s.onclick=()=>nav('contagem');
         return s;
       })));
-      c.appendChild(cardCont);
+      contagensEl=cardCont;
     }
     // Card pedidos aguardando central
     const card=document.createElement('div');
@@ -461,7 +462,11 @@ async function pgDash(c){
         card.appendChild(row);
       });
     }
+    // Ordem pedida: pedidos aguardando central > fichas pendentes > ultimas contagens > stats
     c.appendChild(card);
+    if(fichasEl) c.appendChild(fichasEl);
+    if(contagensEl) c.appendChild(contagensEl);
+    c.appendChild(statsEl);
   }catch(e){c.innerHTML='<div style="padding:20px;color:red;font-weight:700">❌ Erro ao conectar com banco de dados.<br><small>Abra este arquivo no Chrome (não no preview do Claude)</small></div>';}
 }
 function mkStat(ic,lb,val,sub,col){
