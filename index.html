@@ -4807,6 +4807,7 @@ function mkModal(title,content,onSave,cls){
 
 /* ── INIT ── */
 buildShell();renderPage();
+(function(){var q=new URLSearchParams(location.search);if(q.get('embed')!=='1')return;var st=document.createElement('style');st.textContent='.topbar,.sidebar,.mob-overlay{display:none!important}.app-body{min-height:100vh!important}.main{width:100%!important;max-width:100%!important}';document.head.appendChild(st);document.body.classList.add('embed');window.addEventListener('message',function(e){var d=(e&&e.data)||{};if(d.type==='lola-nav'&&d.page&&typeof nav==='function'){nav(d.page);}});var pg=q.get('page');if(pg&&typeof nav==='function'){nav(pg);}try{if(window.parent&&window.parent!==window)window.parent.postMessage({type:'lola-ready'},'*');}catch(_){}})();
 </script>
 </body>
 </html>
