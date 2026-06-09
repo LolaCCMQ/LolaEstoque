@@ -159,6 +159,18 @@ td .sub{font-size:10px;color:var(--ts);margin-top:2px;}
   .custo-box{padding:10px 12px}
   h2{font-size:20px}
 }
+/* Recebimento: tabela cabe no celular */
+@media (max-width:560px){
+  .recv-modal table{table-layout:fixed;width:100%}
+  .recv-modal th,.recv-modal td{padding:6px 4px!important;font-size:11px!important}
+  .recv-modal th{letter-spacing:0!important;font-size:9px!important}
+  .recv-modal td:first-child,.recv-modal th:first-child{white-space:normal!important;word-break:break-word}
+  .recv-modal th:nth-child(2),.recv-modal td:nth-child(2){width:48px}
+  .recv-modal th:nth-child(3),.recv-modal td:nth-child(3){width:50px}
+  .recv-modal th:nth-child(4),.recv-modal td:nth-child(4){width:58px}
+  .recv-modal th:nth-child(5),.recv-modal td:nth-child(5){width:42px}
+  .recv-modal td input[type=number]{width:100%!important;box-sizing:border-box;padding:5px 4px!important;font-size:12px!important}
+}
 </style>
 </head>
 <body>
@@ -3431,7 +3443,7 @@ async function registrarRecebimento(p){
   mo.addEventListener('click',e=>e.stopPropagation());
   ov.addEventListener('click',e=>{if(e.target===ov)ov.remove();});
   mo.appendChild(div('mh',[
-    el('h3',null,'\u{1F4E6} Registrar Recebimento — Pedido #'+p.numero_pedido),
+    (mo.classList.add('recv-modal'),el('h3',null,'\u{1F4E6} Registrar Recebimento — Pedido #'+p.numero_pedido)),
     btn('xb','\u{2715}',()=>ov.remove())
   ]));
   const mb=div('mb');mb.appendChild(ld());
