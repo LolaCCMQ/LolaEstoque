@@ -1681,7 +1681,9 @@ async function verFichaFT(ft){
     '?select=*,lola_insumos(nome,custo_por_unidade),lola_preproducoes(nome,custo_por_unidade)&ficha_id=eq.'+ft.id);}catch(e){console.error(e);}
   try{hist=await db('lola_fichas_historico','GET',null,
     '?ficha_id=eq.'+ft.id+'&order=editado_em.desc&limit=10');}catch(e){}
-  fichaTable(itens,ft.rendimento_qtd,ft.rendimento_un,ft.custo_total,ft.custo_por_porcao,'📋 '+ft.nome,hist);
+  let _fotos=[];
+  try{ const _fr=await db('lola_fichas_fotos','GET',null,'?ficha_id=eq.'+ft.id+'&order=created_at.asc'); _fotos=(_fr||[]).map(function(x){return x.foto;}); }catch(e){}
+  fichaTable(itens,ft.rendimento_qtd,ft.rendimento_un,ft.custo_total,ft.custo_por_porcao,'📋 '+ft.nome,hist,_fotos);
 }
 
 
@@ -1712,6 +1714,48 @@ function mkDestinosSelector(destinos, tipo){
     wrap.appendChild(b);
   });
   wrap.getDestinos=()=>[...selecionados];
+  return wrap;
+}
+
+function _resizeImg(file, cb){
+  try{
+    var r=new FileReader();
+    r.onload=function(){
+      var img=new Image();
+      img.onload=function(){
+        var w=img.width,h=img.height,max=1100;
+        if(w>max||h>max){ if(w>h){h=Math.round(h*max/w);w=max;} else {w=Math.round(w*max/h);h=max;} }
+        var c=document.createElement('canvas'); c.width=w; c.height=h;
+        c.getContext('2d').drawImage(img,0,0,w,h);
+        cb(c.toDataURL('image/jpeg',0.72));
+      };
+      img.src=r.result;
+    };
+    r.readAsDataURL(file);
+  }catch(e){console.error('resize',e);}
+}
+function buildFotosWidget(fotos){
+  var wrap=document.createElement('div');
+  var thumbs=document.createElement('div');
+  thumbs.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-top:8px';
+  function render(){
+    thumbs.innerHTML='';
+    fotos.forEach(function(src,idx){
+      var box=document.createElement('div'); box.style.cssText='position:relative;width:84px;height:84px;border-radius:10px;overflow:hidden;border:1.5px solid var(--rb)';
+      var im=document.createElement('img'); im.src=src; im.style.cssText='width:100%;height:100%;object-fit:cover;cursor:pointer'; im.addEventListener('click',function(){window.open(src,'_blank');});
+      var rm=document.createElement('button'); rm.type='button'; rm.textContent='✕'; rm.style.cssText='position:absolute;top:2px;right:2px;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:11px;line-height:1';
+      rm.addEventListener('click',function(){fotos.splice(idx,1);render();});
+      box.appendChild(im); box.appendChild(rm); thumbs.appendChild(box);
+    });
+  }
+  var fileInp=document.createElement('input'); fileInp.type='file'; fileInp.accept='image/*'; fileInp.multiple=true; fileInp.style.display='none';
+  fileInp.addEventListener('change',function(){
+    var files=Array.prototype.slice.call(this.files); this.value='';
+    files.forEach(function(f){ _resizeImg(f,function(d){ fotos.push(d); render(); }); });
+  });
+  var addBtn=btn('btn bg bsm','📷 Adicionar foto',function(){fileInp.click();});
+  wrap.appendChild(addBtn); wrap.appendChild(fileInp); wrap.appendChild(thumbs);
+  render();
   return wrap;
 }
 
@@ -1883,6 +1927,8 @@ async function modalFicha(item){
   // Seletor de destinos
   const destSelectorFT=mkDestinosSelector(item?.destinos||[],'ft');
 
+  let fotos=[]; if(ed && item?.id){ try{ const _fr=await db('lola_fichas_fotos','GET',null,'?ficha_id=eq.'+item.id+'&order=created_at.asc'); fotos=(_fr||[]).map(function(x){return x.foto;}); }catch(e){} }
+  const fotosWidget=buildFotosWidget(fotos);
   mkModal(ed?'Editar ficha':'Nova ficha técnica',[
     div('fg2',[
       fgrp('Nome do prato',finp('',f.nome,v=>f.nome=v)),
@@ -1898,6 +1944,7 @@ async function modalFicha(item){
     fgrp('Rendimento (qtd)',finp('',f.rendimento_qtd,v=>f.rendimento_qtd=v,'number')),
       fgrp('Unidade rendimento',fsel('',['porção','un','kg','L','pessoa'],f.rendimento_un,v=>f.rendimento_un=v)),
     ]),
+    fgrp('📷 Fotos do prato',fotosWidget),
     el('hr','dv'),
     div('fl_ jb aic mb3',[
       el('strong',null,'Composição do prato',{style:'font-size:13px'}),
@@ -1948,6 +1995,7 @@ async function modalFicha(item){
       if(!ig.id)continue;
       await db('lola_fichas_tecnicas_itens','POST',{ficha_id:fid,insumo_id:ig.tipo==='insumo'?ig.id:null,preproducao_id:ig.tipo==='prep'?ig.id:null,unidade:ig.unidade||'g',qtd_bruta:parseFloat(ig.qtd_bruta)||0,qtd_liquida:parseFloat(ig.qtd_liquida)||0,fc:parseFloat(ig.fc)||1,custo_unitario:parseFloat(ig.custo_unitario)||0,custo_total:parseFloat(ig.custo_total)||0});
     }
+    try{ await db('lola_fichas_fotos','DELETE',null,'?ficha_id=eq.'+fid); for(const _fo of fotos){ await db('lola_fichas_fotos','POST',{ficha_id:fid,foto:_fo}); } }catch(e){console.error('fotos',e);}
     _ft=await db('lola_fichas_tecnicas','GET',null,'?select=*&ativo=eq.true&order=nome.asc');
     drawFT($('#ft-t'));
   },'mo moxl');
@@ -2595,17 +2643,23 @@ async function modalNovaSaida(onSave){
   // Seletor de item
   const selWrap=div('fg2 mt3');
   const selItem=el('select','fs');
-  selItem.appendChild(el('option',null,'— selecione um item —',{value:''}));
-  // Agrupar por categoria no select
-  const grupos={};
-  todosItens.forEach(it=>{if(!grupos[it.categoria])grupos[it.categoria]=[];grupos[it.categoria].push(it);});
-  Object.entries(CONT_CATS).forEach(([cat,label])=>{
-    const catItens=grupos[cat]||[];
-    if(!catItens.length)return;
-    const og=el('optgroup',null,null,{label:label});
-    catItens.forEach(it=>og.appendChild(el('option',null,it.nome,{value:JSON.stringify({id:it.id,nome:it.nome,unidade:it.unidade})})));
-    selItem.appendChild(og);
-  });
+  function rebuildSaidaSelect(q){
+    q=(q||'').toLowerCase().trim();
+    selItem.innerHTML='';
+    selItem.appendChild(el('option',null,'— selecione um item —',{value:''}));
+    const grupos={};
+    todosItens.filter(it=>!q||(it.nome||'').toLowerCase().includes(q)).forEach(it=>{if(!grupos[it.categoria])grupos[it.categoria]=[];grupos[it.categoria].push(it);});
+    Object.entries(CONT_CATS).forEach(([cat,label])=>{
+      const catItens=grupos[cat]||[];
+      if(!catItens.length)return;
+      const og=el('optgroup',null,null,{label:label});
+      catItens.forEach(it=>og.appendChild(el('option',null,it.nome,{value:JSON.stringify({id:it.id,nome:it.nome,unidade:it.unidade})})));
+      selItem.appendChild(og);
+    });
+  }
+  rebuildSaidaSelect('');
+  const buscaItem=el('input','fi',null,{type:'text',placeholder:'🔍 Buscar item...'});
+  buscaItem.addEventListener('input',e=>rebuildSaidaSelect(e.target.value));
   const btnAdd=btn('btn bp bsm','+ Adicionar',()=>{
     if(!selItem.value)return;
     const data=JSON.parse(selItem.value);
@@ -2615,6 +2669,7 @@ async function modalNovaSaida(onSave){
     rebuildLista();
     selItem.value='';
   });
+  selWrap.appendChild(fgrp('🔍 Buscar item',buscaItem));
   selWrap.appendChild(fgrp('Selecionar item',selItem));
   selWrap.appendChild(div('mt2',btnAdd));
 
@@ -4494,7 +4549,7 @@ async function imprimirPed(ped){
    HELPERS
 ══════════════════════════════════ */
 // ── fichaTable: modal com formato planilha ─────────────────────────────────
-function fichaTable(itens,rendQtd,rendUn,custoTotal,custoPorcao,titulo,historico){
+function fichaTable(itens,rendQtd,rendUn,custoTotal,custoPorcao,titulo,historico,fotos){
   // Construção imperativa para evitar bugs com null/string em children
   function td(txt,style,children){
     const t=document.createElement('td');
@@ -4616,7 +4671,13 @@ function fichaTable(itens,rendQtd,rendUn,custoTotal,custoPorcao,titulo,historico
       histEl.appendChild(row);
     });
   }
-  mkModal(titulo,[resumo,scrollWrap,...(histEl?[histEl]:[])],null,'mo moxl');
+  let fotosEl=null;
+  if(fotos&&fotos.length){
+    fotosEl=document.createElement('div');
+    fotosEl.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px';
+    fotos.forEach(function(src){ var im=document.createElement('img'); im.src=src; im.style.cssText='width:120px;height:120px;object-fit:cover;border-radius:10px;border:1.5px solid var(--rb);cursor:pointer'; im.addEventListener('click',function(){window.open(src,'_blank');}); fotosEl.appendChild(im); });
+  }
+  mkModal(titulo,[resumo,...(fotosEl?[fotosEl]:[]),scrollWrap,...(histEl?[histEl]:[])],null,'mo moxl');
 }
 
 
