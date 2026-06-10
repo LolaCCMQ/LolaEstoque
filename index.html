@@ -1145,13 +1145,6 @@ function drawPP(w){
       drawPP($('#pp-t'));
     }));
     card.appendChild(btns);
-    if(x.capa){
-      card.style.display='flex'; card.style.alignItems='stretch'; card.style.gap='12px';
-      var _content=document.createElement('div'); _content.style.cssText='flex:1;min-width:0';
-      while(card.firstChild){ _content.appendChild(card.firstChild); }
-      var _ph=document.createElement('img'); _ph.src=x.capa; _ph.style.cssText='flex-shrink:0;width:92px;height:92px;object-fit:cover;border-radius:12px;border:1.5px solid var(--rb);cursor:pointer;align-self:center'; _ph.addEventListener('click',function(){window.open(x.capa,'_blank');});
-      card.appendChild(_content); card.appendChild(_ph);
-    }
     w.appendChild(card);
   });
 }
