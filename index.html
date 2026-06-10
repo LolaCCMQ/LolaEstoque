@@ -1145,6 +1145,13 @@ function drawPP(w){
       drawPP($('#pp-t'));
     }));
     card.appendChild(btns);
+    if(x.capa){
+      card.style.display='flex'; card.style.alignItems='stretch'; card.style.gap='12px';
+      var _content=document.createElement('div'); _content.style.cssText='flex:1;min-width:0';
+      while(card.firstChild){ _content.appendChild(card.firstChild); }
+      var _ph=document.createElement('img'); _ph.src=x.capa; _ph.style.cssText='flex-shrink:0;width:92px;height:92px;object-fit:cover;border-radius:12px;border:1.5px solid var(--rb);cursor:pointer;align-self:center'; _ph.addEventListener('click',function(){window.open(x.capa,'_blank');});
+      card.appendChild(_content); card.appendChild(_ph);
+    }
     w.appendChild(card);
   });
 }
@@ -1610,6 +1617,13 @@ function drawFT(w){
     });
     btns.appendChild(del);
     card.appendChild(btns);
+    if(x.capa){
+      card.style.display='flex'; card.style.alignItems='stretch'; card.style.gap='12px';
+      var _content=document.createElement('div'); _content.style.cssText='flex:1;min-width:0';
+      while(card.firstChild){ _content.appendChild(card.firstChild); }
+      var _ph=document.createElement('img'); _ph.src=x.capa; _ph.style.cssText='flex-shrink:0;width:92px;height:92px;object-fit:cover;border-radius:12px;border:1.5px solid var(--rb);cursor:pointer;align-self:center'; _ph.addEventListener('click',function(){window.open(x.capa,'_blank');});
+      card.appendChild(_content); card.appendChild(_ph);
+    }
     w.appendChild(card);
   });
 }
@@ -1734,6 +1748,20 @@ function _resizeImg(file, cb){
     r.readAsDataURL(file);
   }catch(e){console.error('resize',e);}
 }
+function _thumbFromDataUrl(dataUrl, max, cb){
+  try{
+    var img=new Image();
+    img.onload=function(){
+      var w=img.width,h=img.height;
+      if(w>max||h>max){ if(w>h){h=Math.round(h*max/w);w=max;} else {w=Math.round(w*max/h);h=max;} }
+      var c=document.createElement('canvas'); c.width=w;c.height=h; c.getContext('2d').drawImage(img,0,0,w,h);
+      cb(c.toDataURL('image/jpeg',0.6));
+    };
+    img.onerror=function(){cb('');};
+    img.src=dataUrl;
+  }catch(e){cb('');}
+}
+function _thumbP(dataUrl,max){ return new Promise(function(res){ _thumbFromDataUrl(dataUrl,max,res); }); }
 function buildFotosWidget(fotos){
   var wrap=document.createElement('div');
   var thumbs=document.createElement('div');
@@ -1977,6 +2005,7 @@ async function modalFicha(item){
     const cpp2=ings.length>0?ct2/parseFloat(f.rendimento_qtd||1):custoPorcaoFixo;
     const descricaoEd=document.getElementById('ft-descricao-edicao')?.value||'';
     const p={nome:f.nome,cardapio:f.cardapio,categoria:f.categoria,destinos:destSelectorFT.getDestinos(),rendimento_qtd:parseFloat(f.rendimento_qtd),rendimento_un:f.rendimento_un,preco_venda:parseFloat(f.preco_venda)||null,custo_total:ct2,custo_por_porcao:cpp2,editado_por:_autorFt.v||null,editado_em:new Date().toISOString()};
+    let _capa=''; if(typeof fotos!=='undefined' && fotos && fotos.length){ try{ _capa=await _thumbP(fotos[0],320); }catch(e){} } p.capa=_capa;
     let fid;
     if(ed){
       await db('lola_fichas_tecnicas','PATCH',p,'?id=eq.'+item.id);
