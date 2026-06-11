@@ -2665,7 +2665,7 @@ async function modalNovaSaida(onSave){
   // Seletor de item
   const selWrap=div('fg2 mt3');
   function _saidaNorm(s){return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');}
-  const buscaItem=el('input','fi',null,{type:'text',placeholder:'\U0001F50D Digite o insumo (ex: vinho, água)...'});
+  const buscaItem=el('input','fi',null,{type:'text',placeholder:'🔍 Digite o insumo (ex: vinho, água)...'});
   const resultsWrap=div(null); resultsWrap.style.cssText='margin-top:8px;max-height:300px;overflow-y:auto';
   function renderResultados(q){
     resultsWrap.innerHTML='';
@@ -2687,7 +2687,7 @@ async function modalNovaSaida(onSave){
     });
   }
   buscaItem.addEventListener('input',e=>renderResultados(e.target.value));
-  selWrap.appendChild(fgrp('\U0001F50D Buscar e adicionar insumo',buscaItem));
+  selWrap.appendChild(fgrp('🔍 Buscar e adicionar insumo',buscaItem));
   selWrap.appendChild(resultsWrap);
   renderResultados('');
   const btnMais=btn('btn bo bsm','\u2795 Adicionar mais itens',()=>{ try{buscaItem.scrollIntoView({behavior:'smooth',block:'center'});}catch(e){} buscaItem.focus(); });
