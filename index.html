@@ -2664,38 +2664,32 @@ async function modalNovaSaida(onSave){
 
   // Seletor de item
   const selWrap=div('fg2 mt3');
-  const selItem=el('select','fs');
-  selItem.setAttribute('size','6'); selItem.style.height='auto';
-  function _saidaNorm(s){return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
-  function rebuildSaidaSelect(q){
+  function _saidaNorm(s){return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');}
+  const buscaItem=el('input','fi',null,{type:'text',placeholder:'\U0001F50D Digite o insumo (ex: vinho, água)...'});
+  const resultsWrap=div(null); resultsWrap.style.cssText='margin-top:8px;max-height:300px;overflow-y:auto';
+  function renderResultados(q){
+    resultsWrap.innerHTML='';
     q=_saidaNorm(q).trim();
-    selItem.innerHTML='';
-    selItem.appendChild(el('option',null,'— selecione um item —',{value:''}));
-    const grupos={};
-    todosItens.filter(it=>!q||_saidaNorm(it.nome).includes(q)).forEach(it=>{if(!grupos[it.categoria])grupos[it.categoria]=[];grupos[it.categoria].push(it);});
-    Object.entries(CONT_CATS).forEach(([cat,label])=>{
-      const catItens=grupos[cat]||[];
-      if(!catItens.length)return;
-      const og=el('optgroup',null,null,{label:label});
-      catItens.forEach(it=>og.appendChild(el('option',null,it.nome,{value:JSON.stringify({id:it.id,nome:it.nome,unidade:it.unidade})})));
-      selItem.appendChild(og);
+    if(!q){ resultsWrap.appendChild(div('tss','Digite acima para buscar um insumo.')); return; }
+    const toks=q.split(/\s+/).filter(Boolean);
+    const scored=[];
+    todosItens.forEach(it=>{ const nn=_saidaNorm(it.nome); if(!toks.every(tk=>nn.indexOf(tk)>=0))return; let sc=2; if(nn.indexOf(q)===0)sc=0; else if(nn.indexOf(' '+q)>=0)sc=1; scored.push({it,sc,nn}); });
+    scored.sort((a,b)=> a.sc-b.sc || a.nn.localeCompare(b.nn));
+    if(!scored.length){ resultsWrap.appendChild(div('tss','Nenhum insumo encontrado.')); return; }
+    scored.slice(0,15).forEach(o=>{ const it=o.it;
+      const ja=itensSaida.find(i=>i.estoque_item_id===it.id);
+      const row=document.createElement('button'); row.type='button';
+      row.style.cssText='display:flex;justify-content:space-between;align-items:center;width:100%;text-align:left;gap:10px;padding:10px 13px;border:1.5px solid var(--rb);border-radius:10px;background:'+(ja?'#f1f1f1':'#fff')+';margin-bottom:6px;cursor:'+(ja?'default':'pointer')+';font-family:Nunito,sans-serif;font-size:13px';
+      const cat=(typeof CONT_CATS!=='undefined'&&CONT_CATS[it.categoria])||it.categoria||'';
+      row.innerHTML='<span style=\"font-weight:700\">'+it.nome+'</span><span style=\"color:var(--ts);font-size:11px;white-space:nowrap\">'+(ja?'✓ já na lista':((it.unidade||'')+(cat?' · '+cat:'')))+'</span>';
+      if(!ja) row.addEventListener('click',()=>{ itensSaida.push({estoque_item_id:it.id,nome_item:it.nome,quantidade:'',unidade:it.unidade,observacoes:''}); rebuildLista(); buscaItem.value=''; renderResultados(''); buscaItem.focus(); });
+      resultsWrap.appendChild(row);
     });
   }
-  rebuildSaidaSelect('');
-  const buscaItem=el('input','fi',null,{type:'text',placeholder:'🔍 Buscar item...'});
-  buscaItem.addEventListener('input',e=>rebuildSaidaSelect(e.target.value));
-  const btnAdd=btn('btn bp bsm','+ Adicionar',()=>{
-    if(!selItem.value)return;
-    const data=JSON.parse(selItem.value);
-    // Verificar se já está na lista
-    if(itensSaida.find(i=>i.estoque_item_id===data.id)){alert('Item já adicionado.');return;}
-    itensSaida.push({estoque_item_id:data.id,nome_item:data.nome,quantidade:'',unidade:data.unidade,observacoes:''});
-    rebuildLista();
-    selItem.value='';
-  });
-  selWrap.appendChild(fgrp('🔍 Buscar item',buscaItem));
-  selWrap.appendChild(fgrp('Selecionar item',selItem));
-  selWrap.appendChild(div('mt2',btnAdd));
+  buscaItem.addEventListener('input',e=>renderResultados(e.target.value));
+  selWrap.appendChild(fgrp('\U0001F50D Buscar e adicionar insumo',buscaItem));
+  selWrap.appendChild(resultsWrap);
+  renderResultados('');
   const btnMais=btn('btn bo bsm','\u2795 Adicionar mais itens',()=>{ try{buscaItem.scrollIntoView({behavior:'smooth',block:'center'});}catch(e){} buscaItem.focus(); });
 
   const inpResp=finp('',f.responsavel,v=>f.responsavel=v);inpResp.placeholder='Seu nome...';
