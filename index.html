@@ -2475,7 +2475,7 @@ async function pgSaidas(c){
     c.innerHTML='';
     let _filtroSetor='';
     const bar=div('abar no-print');
-    const btnNova=btn('btn bp','+ Nova saida',()=>modalNovaSaida(()=>pgSaidas(c)));
+    const btnNova=btn('btn bp','+ Nova saída',()=>modalNovaSaida(()=>pgSaidas(c)));
     btnNova.style.cssText='padding:10px 22px;font-size:13px;font-weight:800;box-shadow:0 3px 10px rgba(170,43,43,.3)';
     bar.appendChild(btnNova);
     c.appendChild(bar);
@@ -2484,11 +2484,11 @@ async function pgSaidas(c){
       '?select=*,lola_saidas!saida_id(id,data_saida,responsavel,destino,observacoes),lola_estoque_itens!estoque_item_id(nome,unidade,categoria)&order=lola_saidas(data_saida).desc');
 
     if(!itens.length){
-      c.appendChild(em('\U0001f4e4','Nenhuma saida registrada ainda'));
+      c.appendChild(em('📤','Nenhuma saída registrada ainda'));
       return;
     }
 
-    const destLabels={venda:'\U0001f6cd️ Venda',evento:'\U0001f3aa Evento',descarte:'\U0001f5d1️ Descarte',outro:'\U0001f4e6 Outro'};
+    const destLabels={venda:'🛍️ Venda',evento:'🎪 Evento',descarte:'🗑️ Descarte',outro:'📦 Outro'};
 
     // Filtro por setor (centro de custo)
     const filtroWrap=div('no-print');
@@ -2520,7 +2520,7 @@ async function pgSaidas(c){
       itens.forEach(it=>{const k=it.setor||'__none';cont[k]=(cont[k]||0)+1;});
       resumoSetor.textContent='Itens por setor:  '+SAIDA_SETORES.map(x=>setorLabel(x)+' '+(cont[x]||0)).join('   ')+(cont['__none']?'   Sem setor '+cont['__none']:'');
 
-      if(!filtrados.length){listaWrap.appendChild(em('\U0001f4e4','Nenhuma saida neste setor'));return;}
+      if(!filtrados.length){listaWrap.appendChild(em('📤','Nenhuma saída neste setor'));return;}
 
       const porData={};
       filtrados.forEach(it=>{const data=it.lola_saidas?.data_saida||'';if(!porData[data])porData[data]=[];porData[data].push(it);});
@@ -2542,7 +2542,7 @@ async function pgSaidas(c){
         const twSaidas=div('tw mb3');
         listaWrap.appendChild(twSaidas);
         const tblS=mkTable(
-          ['Item','Categoria','Qtd','Un','Setor','Destino','Responsavel',''],
+          ['Item','Categoria','Qtd','Un','Setor','Destino','Responsável',''],
           dItens.map((it,_si)=>{
             const cat=it.lola_estoque_itens?.categoria;
             const saida=it.lola_saidas;
@@ -2551,8 +2551,8 @@ async function pgSaidas(c){
             if(isFirst){
               acoesSaida=div('fl_ gap2');
               acoesSaida.appendChild(btn('btn bg bsm','✏️',()=>modalEditarSaida(saida,()=>pgSaidas(c))));
-              acoesSaida.appendChild(btn('btn bd bsm','\U0001f5d1',async()=>{
-                if(!confirm('Excluir esta saida de '+new Date((saida?.data_saida||'')+'T12:00:00').toLocaleDateString('pt-BR')+'?'))return;
+              acoesSaida.appendChild(btn('btn bd bsm','🗑️',async()=>{
+                if(!confirm('Excluir esta saída de '+new Date((saida?.data_saida||'')+'T12:00:00').toLocaleDateString('pt-BR')+'?'))return;
                 await db('lola_saidas_itens','DELETE',null,'?saida_id=eq.'+saida.id);
                 await db('lola_saidas','DELETE',null,'?id=eq.'+saida.id);
                 pgSaidas(c);
@@ -4026,14 +4026,14 @@ async function pgPed(c){
 
 async function verResumoCategorias(label, pedidos){
   const ov=div('ov');const mo=div('mo mol');
-  mo.appendChild(div('mh',[el('h3',null,'\U0001f50e Compras por categoria — '+label),btn('xb','✕',()=>ov.remove())]));
+  mo.appendChild(div('mh',[el('h3',null,'🔎 Compras por categoria — '+label),btn('xb','✕',()=>ov.remove())]));
   const mb=div('mb');mb.appendChild(ld());mo.appendChild(mb);
   ov.appendChild(mo);
   ov.addEventListener('click',e=>{if(e.target===ov)ov.remove();});
   document.body.appendChild(ov);
   try{
     const ids=(pedidos||[]).map(p=>p.id);
-    if(!ids.length){mb.innerHTML='';mb.appendChild(div('tss','Nenhum pedido recebido neste periodo.'));mo.appendChild(div('mf',[btn('btn bg','Fechar',()=>ov.remove())]));return;}
+    if(!ids.length){mb.innerHTML='';mb.appendChild(div('tss','Nenhum pedido recebido neste período.'));mo.appendChild(div('mf',[btn('btn bg','Fechar',()=>ov.remove())]));return;}
     const norm=x=>(x||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
     const [itens,pps,inss]=await Promise.all([
       db('lola_pedidos_itens','GET',null,'?pedido_id=in.('+ids.join(',')+')&select=nome_item,quantidade,preco_unitario'),
@@ -4055,7 +4055,7 @@ async function verResumoCategorias(label, pedidos){
     });
     const linhas=Object.entries(acc).sort((a,b)=>b[1]-a[1]);
     mb.innerHTML='';
-    mb.appendChild(div('card mb3 fl_ jb aic',[el('strong',null,'Total recebido no periodo'),el('span','bold tv',R(total),{style:'font-size:20px;font-family:Playfair Display,serif'})]));
+    mb.appendChild(div('card mb3 fl_ jb aic',[el('strong',null,'Total recebido no período'),el('span','bold tv',R(total),{style:'font-size:20px;font-family:Playfair Display,serif'})]));
     linhas.forEach(([cat,val])=>{
       const pct=total>0?(val/total*100):0;
       const wrap=div('card',null,{style:'margin-bottom:8px'});
