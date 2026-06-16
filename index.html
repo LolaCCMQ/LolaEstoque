@@ -2447,7 +2447,7 @@ async function modalEditarSaida(saida, onSave){
   const destOpts=['venda','evento','descarte','outro'].map(v=>({v,l:({venda:'🛍️ Venda',evento:'🎪 Evento',descarte:'🗑️ Descarte',outro:'📦 Outro'})[v]}));
   mkModal('✏️ Editar Saída',[
     div('fg2',[
-      fgrp('Data',el('input','fi',null,{type:'date',value:f.data,oninput:''})),
+      fgrp('Data',el('input','fi',null,{type:'date',value:f.data,oninput:e=>f.data=e.target.value})),
       fgrp('Destino',fsel('',destOpts,f.destino,v=>f.destino=v)),
     ]),
     fgrp('Responsável',finp('',f.responsavel,v=>f.responsavel=v)),
