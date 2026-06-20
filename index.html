@@ -1519,21 +1519,22 @@ function drawFT(w){
   w.innerHTML='';
   let f=_ftTab==='todos'?[..._ft]:
     _ftTab==='pre'?_ft.filter(x=>x.categoria==='pre'||x.categoria==='pre-producao'):
-    _ft.filter(x=>x.cardapio===_ftTab);
+    _ftTab.indexOf('beb_')===0?_ft.filter(x=>x.cardapio===_ftTab.slice(4)&&x.categoria==='bebida'):
+    _ft.filter(x=>x.cardapio===_ftTab&&x.categoria!=='bebida');
   if(_ftBusca) f=f.filter(x=>x.nome.toLowerCase().includes(_ftBusca.toLowerCase()));
 
   const alertas=f.filter(x=>{
     if(!x.preco_venda||x.preco_venda<=0)return false;
-    return (x.preco_venda-x.custo_por_porcao)/x.preco_venda*100<30;
+    return x.custo_por_porcao/x.preco_venda*100>30;
   });
   if(alertas.length&&!_ftBusca){
     const alertBox=div('al',null,{style:'background:#fee2e2;border:1.5px solid #fca5a5;color:#7f1d1d;border-radius:10px;padding:12px 16px;margin-bottom:14px'});
-    alertBox.appendChild(el('div','bold','Atencao - pratos com margem baixa ou negativa:',{style:'margin-bottom:8px;font-size:13px'}));
+    alertBox.appendChild(el('div','bold','Revisar ficha técnica - CMV acima de 30%:',{style:'margin-bottom:8px;font-size:13px'}));
     alertas.forEach(x=>{
-      const mg=((x.preco_venda-x.custo_por_porcao)/x.preco_venda*100).toFixed(0);
+      const cmv=(x.custo_por_porcao/x.preco_venda*100).toFixed(0);
       alertBox.appendChild(div('fl_ jb aic',[
-        span(null,(parseFloat(mg)<0?'Negativa: ':'Baixa: ')+x.nome,{style:'font-size:12px;font-weight:600'}),
-        span(null,'custo '+R(x.custo_por_porcao)+' venda '+R(x.preco_venda)+' '+mg+'%',{style:'font-size:11px;opacity:.8'})
+        span(null,x.nome,{style:'font-size:12px;font-weight:600'}),
+        span(null,'custo '+R(x.custo_por_porcao)+' venda '+R(x.preco_venda)+' CMV '+cmv+'%',{style:'font-size:11px;opacity:.8'})
       ],{style:'padding:4px 0;border-bottom:1px solid #fca5a580'}));
     });
     w.appendChild(alertBox);
@@ -1545,11 +1546,11 @@ function drawFT(w){
 
   f.forEach(x=>{
     const semPreco=!x.preco_venda||x.preco_venda<=0;
-    const mg=semPreco?null:((x.preco_venda-x.custo_por_porcao)/x.preco_venda*100);
+    const cmv=semPreco?null:(x.custo_por_porcao/x.preco_venda*100);
     const dataEd=x.editado_em?new Date(x.editado_em).toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}):null;
 
     const card=document.createElement('div');
-    card.style.cssText='background:#fff;border:1.5px solid var(--rb);border-radius:14px;padding:12px 14px;margin-bottom:10px'+((!semPreco&&mg<0)?';border-color:#fca5a5;background:#fff5f5':(!semPreco&&mg<30)?';border-color:#fcd34d;background:#fffbeb':'');
+    card.style.cssText='background:#fff;border:1.5px solid var(--rb);border-radius:14px;padding:12px 14px;margin-bottom:10px'+((!semPreco&&cmv>30)?';border-color:#fca5a5;background:#fff5f5':'');
 
     // Linha 1: nome + badge revisar
     const l1=document.createElement('div');l1.style.cssText='display:flex;align-items:flex-start;gap:8px;margin-bottom:6px';
@@ -1588,8 +1589,8 @@ function drawFT(w){
     if(!semPreco){
       l2.appendChild(mkInfo('Preço venda',R(x.preco_venda)));
       const mgWrap=document.createElement('div');
-      const mgLbl=document.createElement('div');mgLbl.style.cssText='font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:1px';mgLbl.textContent='Margem';
-      const mgVal=mkMargem(x.preco_venda,x.custo_por_porcao);
+      const mgLbl=document.createElement('div');mgLbl.style.cssText='font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:1px';mgLbl.textContent='CMV';
+      const mgVal=mkCMV(x.preco_venda,x.custo_por_porcao);
       mgWrap.appendChild(mgLbl);mgWrap.appendChild(mgVal);
       l2.appendChild(mgWrap);
     }
@@ -1632,7 +1633,14 @@ async function pgFichas(c){
     c.innerHTML='';
     _ftBusca='';
     const ftSearchEl=mkSearch(q=>{_ftBusca=q;drawFT($('#ft-t'));},'Buscar ficha técnica...');
-    const ftTabsEl=mkTabs(['todos','ccmq','mac','eventos'],_ftTab,t=>{_ftTab=t;drawFT($('#ft-t'));},['Tudo','CCMQ','MAC','Eventos'],true);
+    const _ftKeys=['todos','ccmq','beb_ccmq','mac','beb_mac','eventos','beb_eventos'];
+    const _ftLbls=['Tudo','Pratos CCMQ','Bebidas CCMQ','Pratos MAC','Bebidas MAC','Pratos Eventos','Bebidas Eventos'];
+    const _ftCor={ccmq:'#AA2B2B',beb_ccmq:'#AA2B2B',mac:'#166534',beb_mac:'#166534',eventos:'#caa300',beb_eventos:'#caa300'};
+    const _ftDark={eventos:1,beb_eventos:1};
+    let ftTabsEl;
+    function _paintBebTabs(){if(!ftTabsEl)return;ftTabsEl.querySelectorAll('.tp').forEach((tp,i)=>{const k=_ftKeys[i];const cor=_ftCor[k];if(!cor)return;if(tp.classList.contains('active')){tp.style.background=cor;tp.style.color=_ftDark[k]?'#3a2e00':'#fff';tp.style.borderColor=cor;}else{tp.style.background='#fff';tp.style.color=cor;tp.style.borderColor=cor;}});}
+    ftTabsEl=mkTabs(_ftKeys,_ftTab,t=>{_ftTab=t;drawFT($('#ft-t'));_paintBebTabs();},_ftLbls,true);
+    _paintBebTabs();
     const ftBarEsq=div(null);ftBarEsq.style.cssText='display:flex;align-items:center;gap:8px;flex-wrap:wrap;';
     ftBarEsq.appendChild(ftTabsEl);ftBarEsq.appendChild(ftSearchEl);
     const ftBar=div('abar no-print');
@@ -1644,41 +1652,20 @@ async function pgFichas(c){
   }catch(e){c.innerHTML='<p style="color:red;padding:20px">'+e.message+'</p>';}
 }
 
-function mkMargem(preco_venda, custo){
+function mkCMV(preco_venda, custo){
   if(!preco_venda||preco_venda<=0) return span('tss','sem preço');
-  const mg=(preco_venda-custo)/preco_venda*100;
-  const mgStr=mg.toFixed(0)+'%';
-  if(mg<0){
-    // Prejuízo — vermelho forte com ícone
-    const w=div('fl_ aic gap2',[
+  const cmv=custo/preco_venda*100;
+  const cmvStr=cmv.toFixed(0)+'%';
+  if(cmv>30){
+    return div('fl_ aic gap2',[
       span(null,'🔴'),
-      el('span','bold',mgStr,{style:'color:#dc2626'}),
-      span('tss','prejuízo',{style:'font-size:10px;background:#fee2e2;color:#dc2626;padding:1px 6px;border-radius:50px'})
-    ]);
-    return w;
-  }
-  if(mg<30){
-    return div('fl_ aic gap2',[
-      span(null,'🟠'),
-      el('span','bold',mgStr,{style:'color:#c4852a'}),
-      span('tss','baixa',{style:'font-size:10px;background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:50px'})
-    ]);
-  }
-  if(mg<50){
-    return div('fl_ aic gap2',[
-      span(null,'🟡'),
-      el('span','bold',mgStr,{style:'color:#92400e'}),
-    ]);
-  }
-  if(mg<70){
-    return div('fl_ aic gap2',[
-      span(null,'🟢'),
-      el('span','bold',mgStr,{style:'color:var(--vd)'}),
+      el('span','bold',cmvStr,{style:'color:#dc2626'}),
+      span('tss','revisar ficha',{style:'font-size:10px;background:#fee2e2;color:#dc2626;padding:1px 6px;border-radius:50px'})
     ]);
   }
   return div('fl_ aic gap2',[
-    span(null,'✅'),
-    el('span','bold',mgStr,{style:'color:var(--vd)'}),
+    span(null,'🟢'),
+    el('span','bold',cmvStr,{style:'color:var(--vd)'}),
   ]);
 }
 
@@ -1785,13 +1772,17 @@ function buildFotosWidget(fotos){
 async function modalFicha(item){
   try{
   const ed=!!item;
-  let f={nome:item?.nome||'',cardapio:item?.cardapio||_ftTab,categoria:item?.categoria||'prato',rendimento_qtd:item?.rendimento_qtd||1,rendimento_un:item?.rendimento_un||'porção',preco_venda:item?.preco_venda||''};
+  const _tabBeb=(_ftTab||'').indexOf('beb_')===0;
+  const _tabCard=_tabBeb?_ftTab.slice(4):(['ccmq','mac','eventos','central'].includes(_ftTab)?_ftTab:'ccmq');
+  const _defCat=item?.categoria||(_tabBeb?'bebida':'prato');
+  let f={nome:item?.nome||'',cardapio:item?.cardapio||_tabCard,categoria:_defCat,rendimento_qtd:item?.rendimento_qtd||1,rendimento_un:item?.rendimento_un||'porção',preco_venda:item?.preco_venda||'',meta_cmv:item?.meta_cmv||30};
   // Custo fixo do banco — não zera ao editar preço de venda
   let custoTotalFixo=parseFloat(item?.custo_total||0);
   let custoPorcaoFixo=parseFloat(item?.custo_por_porcao||0);
   const ings=[];
   const iw=div(null);
   const custoResEl=div('custo-box');
+  let precoInp=null,metaCmvInp=null,_precoSug=0;
 
   // Carregar ingredientes existentes se estiver editando
   if(ed && item?.id){
@@ -1819,10 +1810,14 @@ async function modalFicha(item){
     const qtd=parseFloat(f.rendimento_qtd||1);
     const cpp=ings.length>0?ct/qtd:custoPorcaoFixo;
     const pv=parseFloat(f.preco_venda)||0;
-    const mg=pv>0?((pv-cpp)/pv*100).toFixed(0):null;
+    const cmv=pv>0?(cpp/pv*100):null;
+    const meta=parseFloat(f.meta_cmv)||33;
+    _precoSug=meta>0?cpp/(meta/100):0;
+    const cmvCor=cmv==null?'':(cmv<=30?'var(--vd)':'#dc2626');
     custoResEl.innerHTML='<div class="fl_ jb mb3"><span>Custo total</span><strong>'+R(ct)+'</strong></div>'+
       '<div class="fl_ jb mb3"><span>Custo/porção</span><strong class="tv">'+R(cpp)+'</strong></div>'+
-      (mg?'<div class="fl_ jb"><span>Margem bruta</span><strong style="color:'+(mg>=60?'var(--vd)':mg>=40?'var(--am)':'#dc2626')+'">'+mg+'%</strong></div>':'');
+      (cmv!=null?'<div class="fl_ jb mb3"><span>CMV atual</span><strong style="color:'+cmvCor+'">'+cmv.toFixed(0)+'%</strong></div>':'')+
+      '<div class="fl_ jb"><span>Preço sugerido (CMV '+meta+'%)</span><strong class="tv">'+R(_precoSug)+'</strong></div>';
   }
 
   // Lista unificada: insumos + pré-prods em ordem alfabética com prefixo
@@ -1952,6 +1947,8 @@ async function modalFicha(item){
 
   let fotos=[]; if(ed && item?.id){ try{ const _fr=await db('lola_fichas_fotos','GET',null,'?ficha_id=eq.'+item.id+'&order=created_at.asc'); fotos=(_fr||[]).map(function(x){return x.foto;}); }catch(e){} }
   const fotosWidget=buildFotosWidget(fotos);
+  precoInp=finp('',f.preco_venda,v=>{f.preco_venda=v;calcTotais();},'number');
+  metaCmvInp=finp('',f.meta_cmv,v=>{f.meta_cmv=v;calcTotais();},'number');
   mkModal(ed?'Editar ficha':'Nova ficha técnica',[
     div('fg2',[
       fgrp('Nome do prato',finp('',f.nome,v=>f.nome=v)),
@@ -1959,8 +1956,12 @@ async function modalFicha(item){
     ]),
     div('fg3',[
       fgrp('Cardápio',fsel('',['ccmq','mac','central','eventos'],f.cardapio,v=>f.cardapio=v)),
-      fgrp('Categoria',fsel('',['prato','sobremesa','bebida','produto_evento'],f.categoria,v=>f.categoria=v)),
-      fgrp('Preço de venda (R$)',finp('',f.preco_venda,v=>{f.preco_venda=v;calcTotais();},'number')),
+      fgrp('Categoria',fsel('',['prato','sobremesa','bebida','produto_evento'],f.categoria,v=>{f.categoria=v;})),
+      fgrp('Preço de venda (R$)',precoInp),
+    ]),
+    div('fg2',[
+      fgrp('🎯 Meta de CMV (%)',metaCmvInp),
+      fgrp('\u00A0',btn('btn bg bsm','↧ Usar preço sugerido',()=>{if(_precoSug>0){f.preco_venda=_precoSug.toFixed(2);if(precoInp)precoInp.value=f.preco_venda;calcTotais();}})),
     ]),
     div('fg2',[
       fgrp('🏷️ Onde é servido',destSelectorFT),
