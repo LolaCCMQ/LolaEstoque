@@ -1187,6 +1187,9 @@ async function modalPrep(item){
   let f={nome:item?.nome||'',categoria:item?.categoria||_ppTab,cat_custo:item?.cat_custo||'',rendimento_qtd:item?.rendimento_qtd||1000,rendimento_un:item?.rendimento_un||'g',custo_total:item?.custo_total||0,custo_por_unidade:item?.custo_por_unidade||0,valor_venda_central:item?.valor_venda_central||0,margem_venda:item?.margem_venda||70,porcao_qtd:item?.porcao_qtd||null,porcao_un:item?.porcao_un||null};
   const ings=[];
   const iw=div(null);
+  let rendInp; f._rendManual=!!(ed&&item&&item.rendimento_qtd);
+  function ingSumBase(){var s=0;ings.forEach(function(ig){var q=parseFloat(ig.qtd_bruta||ig.qtd_liquida||0)||0;var u=ig.unidade||'g';if(u==='un'||u==='porção')return;var k=(u==='kg'||u==='L')?1000:(u==='mg'?0.001:1);s+=q*k;});return s;}
+  function sumInRendUn(){var b=ingSumBase();var u=f.rendimento_un;return (u==='kg'||u==='L')?b/1000:b;}
 
   // Carregar ingredientes existentes se editando
   if(ed && item?.id){
@@ -1217,6 +1220,7 @@ async function modalPrep(item){
       return t+parseFloat(ig.custo_total||0);
     },0);
     f.custo_total=ct;
+    if(!f._rendManual){var _s=sumInRendUn();if(_s>0){f.rendimento_qtd=Math.round(_s*1000)/1000;if(rendInp)rendInp.value=f.rendimento_qtd;}}
     const qtd=parseFloat(f.rendimento_qtd)||1;
     // Calcular custo na unidade base correta
     // g → custo por kg (×1000/qtd), ml → custo por L (×1000/qtd)
@@ -1382,7 +1386,7 @@ async function modalPrep(item){
     fgrp('🏷️ Onde é utilizado',destBtnsWrap),
     preChkWrap,
     div('fg2',[
-      fgrp('Rendimento total',finp('',f.rendimento_qtd,v=>{f.rendimento_qtd=v;calcTotais();},'number')),
+      fgrp('Rendimento total',el('div',null,[(rendInp=finp('',f.rendimento_qtd,v=>{f.rendimento_qtd=v;f._rendManual=true;calcTotais();},'number')),el('button','btn bg bsm','= soma dos ingredientes',{type:'button',style:'margin-top:6px;display:block',onclick:()=>{f._rendManual=false;f.rendimento_qtd=Math.round(sumInRendUn()*1000)/1000;rendInp.value=f.rendimento_qtd;calcTotais();}})])),
       fgrp('Unidade',fsel('',['g','ml','kg','L','un','porção'],f.rendimento_un,v=>{f.rendimento_un=v;calcTotais();})),
     ]),
     div('fg3',[
