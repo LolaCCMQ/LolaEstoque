@@ -1184,11 +1184,11 @@ async function verFichaPrep(pp){
 async function modalPrep(item){
   const ed=!!item;
   let margInp;
-  let f={nome:item?.nome||'',categoria:item?.categoria||_ppTab,cat_custo:item?.cat_custo||'',rendimento_qtd:item?.rendimento_qtd||1000,rendimento_un:item?.rendimento_un||'g',custo_total:item?.custo_total||0,custo_por_unidade:item?.custo_por_unidade||0,valor_venda_central:item?.valor_venda_central||0,margem_venda:item?.margem_venda||70,porcao_qtd:item?.porcao_qtd||null,porcao_un:item?.porcao_un||null};
+  let f={nome:item?.nome||'',categoria:item?.categoria||_ppTab,cat_custo:item?.cat_custo||'',rendimento_qtd:item?.rendimento_qtd||1000,rendimento_un:item?.rendimento_un||'g',custo_total:item?.custo_total||0,custo_por_unidade:item?.custo_por_unidade||0,valor_venda_central:item?.valor_venda_central||0,margem_venda:item?.margem_venda||70,porcao_qtd:item?.porcao_qtd||null,porcao_un:item?.porcao_un||null,modo_preparo:item?.modo_preparo||'',observacoes:item?.observacoes||''};
   const ings=[];
   const iw=div(null);
   let rendInp; f._rendManual=!!(ed&&item&&item.rendimento_qtd);
-  function ingSumBase(){var s=0;ings.forEach(function(ig){var q=parseFloat(ig.qtd_bruta||ig.qtd_liquida||0)||0;var u=ig.unidade||'g';if(u==='un'||u==='porção')return;var k=(u==='kg'||u==='L')?1000:(u==='mg'?0.001:1);s+=q*k;});return s;}
+  function ingSumBase(){var dim=_dimUn(f.rendimento_un);var s=0;ings.forEach(function(ig){var q=parseFloat(ig.qtd_bruta||ig.qtd_liquida||0)||0;var u=ig.unidade||'g';if(_dimUn(u)!==dim)return;s+=(dim==='outro')?q:_baseUn(q,u);});return s;}
   function sumInRendUn(){var b=ingSumBase();var u=f.rendimento_un;return (u==='kg'||u==='L')?b/1000:b;}
 
   // Carregar ingredientes existentes se editando
@@ -1231,7 +1231,7 @@ async function modalPrep(item){
     f.valor_venda_central=f.custo_por_unidade/(m/100);
     const numPorcoes2=parseFloat(f.porcao_qtd)>0?(parseFloat(f.rendimento_qtd)/parseFloat(f.porcao_qtd)):null;
     const custoPorcao2=numPorcoes2?ct/numPorcoes2:null;
-    custoResEl.innerHTML='<div class="fl_ jb mb3"><span>Custo total</span><strong>'+R(ct)+'</strong></div>'+
+    custoResEl.innerHTML=somaIngredientesHTML(ings)+'<div class="fl_ jb mb3"><span>Custo total</span><strong>'+R(ct)+'</strong></div>'+
       '<div class="fl_ jb mb3"><span>Rendimento total</span><strong>'+N(qtd,0)+' '+f.rendimento_un+'</strong></div>'+
       (numPorcoes2?'<div class="fl_ jb mb3"><span>Porções ('+N(f.porcao_qtd,0)+' '+f.porcao_un+')</span><strong>'+numPorcoes2.toFixed(1)+'</strong></div>':'')+
       (custoPorcao2?'<div class="fl_ jb mb3"><span>Custo/porção</span><strong class="tv">'+R(custoPorcao2)+'</strong></div>':'')+'<div class="fl_ jb mb3"><span>Custo/'+unBase+'</span><strong class="tv">'+R(f.custo_por_unidade)+'</strong></div>'+
@@ -1407,12 +1407,15 @@ async function modalPrep(item){
     ]),
     iw,
     custoResEl,
+    el('hr','dv'),
+    fgrp('📝 Modo de preparo',el('textarea','fi',f.modo_preparo||'',{oninput:e=>{f.modo_preparo=e.target.value;},rows:'4',placeholder:'Passo a passo do preparo...',style:'width:100%;resize:vertical;min-height:70px;font-family:inherit'})),
+    fgrp('🗒️ Observações',el('textarea','fi',f.observacoes||'',{oninput:e=>{f.observacoes=e.target.value;},rows:'3',placeholder:'Observações sobre a receita...',style:'width:100%;resize:vertical;min-height:55px;font-family:inherit'})),
   ],async()=>{
     f.custo_total=ings.reduce((t,ig)=>t+parseFloat(ig.custo_total||0),0);
     const qtd=parseFloat(f.rendimento_qtd)||1;
     f.custo_por_unidade=(['g','ml'].includes(f.rendimento_un))?(f.custo_total/qtd)*1000:f.custo_total/qtd;
     if(!f.valor_venda_central||f.valor_venda_central===0)f.valor_venda_central=f.custo_por_unidade*1.7;
-    const p={nome:f.nome,categoria:f.categoria,cat_custo:f.cat_custo||null,destinos:[..._selDestsPP],e_preparo:_isPre,rendimento_qtd:parseFloat(f.rendimento_qtd),rendimento_un:f.rendimento_un,porcao_qtd:parseFloat(f.porcao_qtd)||null,porcao_un:f.porcao_un||null,custo_total:f.custo_total,custo_por_unidade:f.custo_por_unidade,valor_venda_central:parseFloat(f.valor_venda_central),margem_venda:parseFloat(f.margem_venda)||70,editado_por:_autorPP.v||null,editado_em:new Date().toISOString()};
+    const p={nome:f.nome,categoria:f.categoria,cat_custo:f.cat_custo||null,destinos:[..._selDestsPP],e_preparo:_isPre,rendimento_qtd:parseFloat(f.rendimento_qtd),rendimento_un:f.rendimento_un,porcao_qtd:parseFloat(f.porcao_qtd)||null,porcao_un:f.porcao_un||null,custo_total:f.custo_total,custo_por_unidade:f.custo_por_unidade,valor_venda_central:parseFloat(f.valor_venda_central),margem_venda:parseFloat(f.margem_venda)||70,modo_preparo:f.modo_preparo||null,observacoes:f.observacoes||null,editado_por:_autorPP.v||null,editado_em:new Date().toISOString()};
     let pid;
     if(ed){await db('lola_preproducoes','PATCH',p,'?id=eq.'+item.id);await db('lola_preproducoes_itens','DELETE',null,'?preproducao_id=eq.'+item.id);pid=item.id;}
     else{const[nv]=await db('lola_preproducoes','POST',p);pid=nv.id;}
@@ -1779,7 +1782,7 @@ async function modalFicha(item){
   const _tabBeb=(_ftTab||'').indexOf('beb_')===0;
   const _tabCard=_tabBeb?_ftTab.slice(4):(['ccmq','mac','eventos','central'].includes(_ftTab)?_ftTab:'ccmq');
   const _defCat=item?.categoria||(_tabBeb?'bebida':'prato');
-  let f={nome:item?.nome||'',cardapio:item?.cardapio||_tabCard,categoria:_defCat,rendimento_qtd:item?.rendimento_qtd||1,rendimento_un:item?.rendimento_un||'porção',preco_venda:item?.preco_venda||'',meta_cmv:item?.meta_cmv||30};
+  let f={nome:item?.nome||'',cardapio:item?.cardapio||_tabCard,categoria:_defCat,rendimento_qtd:item?.rendimento_qtd||1,rendimento_un:item?.rendimento_un||'porção',preco_venda:item?.preco_venda||'',meta_cmv:item?.meta_cmv||30,modo_preparo:item?.modo_preparo||'',observacoes:item?.observacoes||''};
   // Custo fixo do banco — não zera ao editar preço de venda
   let custoTotalFixo=parseFloat(item?.custo_total||0);
   let custoPorcaoFixo=parseFloat(item?.custo_por_porcao||0);
@@ -1818,7 +1821,7 @@ async function modalFicha(item){
     const meta=parseFloat(f.meta_cmv)||33;
     _precoSug=meta>0?cpp/(meta/100):0;
     const cmvCor=cmv==null?'':(cmv<=30?'var(--vd)':'#dc2626');
-    custoResEl.innerHTML='<div class="fl_ jb mb3"><span>Custo total</span><strong>'+R(ct)+'</strong></div>'+
+    custoResEl.innerHTML=somaIngredientesHTML(ings)+'<div class="fl_ jb mb3"><span>Custo total</span><strong>'+R(ct)+'</strong></div>'+
       '<div class="fl_ jb mb3"><span>Custo/porção</span><strong class="tv">'+R(cpp)+'</strong></div>'+
       (cmv!=null?'<div class="fl_ jb mb3"><span>CMV atual</span><strong style="color:'+cmvCor+'">'+cmv.toFixed(0)+'%</strong></div>':'')+
       '<div class="fl_ jb"><span>Preço sugerido (CMV '+meta+'%)</span><strong class="tv">'+R(_precoSug)+'</strong></div>';
@@ -1980,6 +1983,9 @@ async function modalFicha(item){
     ]),
     iw,custoResEl,
     el('hr','dv'),
+    fgrp('📝 Modo de preparo',el('textarea','fi',f.modo_preparo||'',{oninput:e=>{f.modo_preparo=e.target.value;},rows:'4',placeholder:'Passo a passo do preparo...',style:'width:100%;resize:vertical;min-height:70px;font-family:inherit'})),
+    fgrp('🗒️ Observações',el('textarea','fi',f.observacoes||'',{oninput:e=>{f.observacoes=e.target.value;},rows:'3',placeholder:'Observações sobre a receita...',style:'width:100%;resize:vertical;min-height:55px;font-family:inherit'})),
+    el('hr','dv'),
     (()=>{
       const autorWrap=div('fl_ aic gap2');
       autorWrap.style.cssText='margin-top:4px;padding:10px 14px;background:var(--rt);border-radius:10px;border:1.5px solid var(--rb)';
@@ -2004,7 +2010,7 @@ async function modalFicha(item){
     const ct2=ings.length>0?ings.reduce((t,ig)=>t+parseFloat(ig.custo_total||0),0):custoTotalFixo;
     const cpp2=ings.length>0?ct2/parseFloat(f.rendimento_qtd||1):custoPorcaoFixo;
     const descricaoEd=document.getElementById('ft-descricao-edicao')?.value||'';
-    const p={nome:f.nome,cardapio:f.cardapio,categoria:f.categoria,destinos:destSelectorFT.getDestinos(),rendimento_qtd:parseFloat(f.rendimento_qtd),rendimento_un:f.rendimento_un,preco_venda:parseFloat(f.preco_venda)||null,custo_total:ct2,custo_por_porcao:cpp2,editado_por:_autorFt.v||null,editado_em:new Date().toISOString()};
+    const p={nome:f.nome,cardapio:f.cardapio,categoria:f.categoria,destinos:destSelectorFT.getDestinos(),rendimento_qtd:parseFloat(f.rendimento_qtd),rendimento_un:f.rendimento_un,preco_venda:parseFloat(f.preco_venda)||null,custo_total:ct2,custo_por_porcao:cpp2,modo_preparo:f.modo_preparo||null,observacoes:f.observacoes||null,editado_por:_autorFt.v||null,editado_em:new Date().toISOString()};
     let _capa=''; if(typeof fotos!=='undefined' && fotos && fotos.length){ try{ _capa=await _thumbP(fotos[0],320); }catch(e){} } p.capa=_capa;
     let fid;
     if(ed){
@@ -4967,6 +4973,9 @@ function mkSearch(onChange,ph){
   inp.addEventListener('input',e=>onChange(e.target.value));
   return div('sb',[document.createTextNode('🔍'),inp]);
 }
+function _dimUn(u){if(u==='g'||u==='kg'||u==='mg')return 'massa';if(u==='ml'||u==='L')return 'vol';return 'outro';}
+function _baseUn(q,u){if(u==='kg'||u==='L')return q*1000;if(u==='mg')return q*0.001;return q;}
+function somaIngredientesHTML(ings){var massa=0,vol=0,count=0;(ings||[]).forEach(function(ig){var q=parseFloat(ig.qtd_bruta||ig.qtd_liquida||0)||0;if(!q)return;var u=ig.unidade||'g';var d=_dimUn(u);if(d==='massa')massa+=_baseUn(q,u);else if(d==='vol')vol+=_baseUn(q,u);else count+=q;});var parts=[];if(massa>0)parts.push(massa>=1000?(+(massa/1000).toFixed(3))+' kg':(+massa.toFixed(0))+' g');if(vol>0)parts.push(vol>=1000?(+(vol/1000).toFixed(3))+' L':(+vol.toFixed(0))+' ml');if(count>0)parts.push((+count.toFixed(2))+' un');if(!parts.length)return '';var aviso=parts.length>1?' <span style="color:#b45309;font-weight:700">⚠️ tipos de unidade diferentes</span>':'';return '<div class="fl_ jb mb3"><span>Soma dos ingredientes</span><strong>'+parts.join(' + ')+aviso+'</strong></div>';}
 function fgrp(label,input){const g=div('fg');g.appendChild(el('label','fl',label));g.appendChild(input);return g;}
 function finp(id,val,onChange,type){
   const i=el('input','fi',null,{type:type||'text',value:val!=null?String(val):'',id:id||''});
