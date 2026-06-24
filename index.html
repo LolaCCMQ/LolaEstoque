@@ -1304,7 +1304,7 @@ async function modalPrep(item){
       const qbI=finp('',ig.qtd_bruta!=null&&ig.qtd_bruta!==''?String(ig.qtd_bruta).replace('.',','):'',v=>{ig.qtd_bruta=(v||'').replace(',','.');calcItem(idx);},'text');qbI.setAttribute('inputmode','decimal');
       qbI.style.cssText='width:80px;flex-shrink:0';qbI.placeholder='Qtd';
       const fcI=finp('',ig.fc!=null?String(ig.fc).replace('.',','):1,v=>{ig.fc=(v||'').replace(',','.');calcItem(idx);},'text');fcI.setAttribute('inputmode','decimal');
-      fcI.style.cssText='width:50px;flex-shrink:0';
+      fcI.style.cssText='width:72px;flex-shrink:0;text-align:center';
       const ctEl=span('bold tv',R(ig.custo_total||0));
       ctEl.style.cssText='font-size:12px;white-space:nowrap;min-width:65px;text-align:right;flex-shrink:0';
 
@@ -1904,7 +1904,7 @@ async function modalFicha(item){
       qbI.placeholder='Qtd';
 
       const fcI=finp('',ig.fc!=null?String(ig.fc).replace('.',','):1,v=>{ig.fc=(v||'').replace(',','.');calcItem(idx);},'text');fcI.setAttribute('inputmode','decimal');
-      fcI.style.cssText='width:50px;flex-shrink:0';
+      fcI.style.cssText='width:72px;flex-shrink:0;text-align:center';
 
       const ctEl=span('bold tv',R(ig.custo_total||0));
       ctEl.style.cssText='font-size:12px;white-space:nowrap;min-width:65px;text-align:right;flex-shrink:0';
