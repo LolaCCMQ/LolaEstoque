@@ -1303,7 +1303,7 @@ async function modalPrep(item){
 
       const qbI=finp('',ig.qtd_bruta||'',v=>{ig.qtd_bruta=v;calcItem(idx);},'number');
       qbI.style.cssText='width:80px;flex-shrink:0';qbI.placeholder='Qtd';
-      const fcI=finp('',ig.fc||1,v=>{ig.fc=v;calcItem(idx);},'number');
+      const fcI=finp('',ig.fc||1,v=>{ig.fc=v;calcItem(idx);},'number');fcI.step='0.01';fcI.setAttribute('inputmode','decimal');
       fcI.style.cssText='width:50px;flex-shrink:0';
       const ctEl=span('bold tv',R(ig.custo_total||0));
       ctEl.style.cssText='font-size:12px;white-space:nowrap;min-width:65px;text-align:right;flex-shrink:0';
@@ -1903,7 +1903,7 @@ async function modalFicha(item){
       qbI.style.cssText='width:80px;flex-shrink:0';
       qbI.placeholder='Qtd';
 
-      const fcI=finp('',ig.fc||1,v=>{ig.fc=v;calcItem(idx);},'number');
+      const fcI=finp('',ig.fc||1,v=>{ig.fc=v;calcItem(idx);},'number');fcI.step='0.01';fcI.setAttribute('inputmode','decimal');
       fcI.style.cssText='width:50px;flex-shrink:0';
 
       const ctEl=span('bold tv',R(ig.custo_total||0));
