@@ -4705,7 +4705,7 @@ function fichaTable(itens,rendQtd,rendUn,custoTotal,custoPorcao,titulo,historico
   // THEAD
   const thead=document.createElement('thead');
   const hRow=document.createElement('tr');
-  [['Insumo','left'],['Obs','left'],['UN','center'],['QTD Bruta','right'],['QTD Líquida','right'],
+  [['Insumo','left'],['Obs','left'],['UN','center'],['Qtd Líq.','right'],['Qtd Bruta','right'],
    ['Perda','right'],['FC','right'],['% Perda','right'],['Preço kg·L·un','right'],['Custo','right']]
   .forEach(([h,a])=>hRow.appendChild(th(h,a)));
   thead.appendChild(hRow);
@@ -4718,9 +4718,9 @@ function fichaTable(itens,rendQtd,rendUn,custoTotal,custoPorcao,titulo,historico
     const isPP=!it.lola_insumos?.nome;
     const preco=parseFloat(it.custo_unitario)||0;
     const qb=parseFloat(it.qtd_bruta)||0;
-    const ql=parseFloat(it.qtd_liquida)||0;
-    const perda=Math.max(0,qb-ql);
-    const pct=qb>0?Math.round((perda/qb)*100):0;
+    const bruto=(qb)*(parseFloat(it.fc)||1);
+    const perda=Math.max(0,bruto-qb);
+    const pct=bruto>0?Math.round((perda/bruto)*100):0;
     const fc=parseFloat(it.fc)||1;
     const tr=document.createElement('tr');
     tr.style.cssText=(idx%2===0?'background:var(--rf)':'background:#fff')+';border-bottom:1px solid var(--rb)';
@@ -4736,7 +4736,7 @@ function fichaTable(itens,rendQtd,rendUn,custoTotal,custoPorcao,titulo,historico
     tr.appendChild(td(it.nome_manual||'','padding:8px 10px;font-size:11px;color:var(--ts)'));
     tr.appendChild(td(it.unidade||'g','padding:8px 10px;font-size:12px;text-align:center'));
     tr.appendChild(td(N(qb,2),'padding:8px 10px;font-size:12px;text-align:right'));
-    tr.appendChild(td(N(ql,2),'padding:8px 10px;font-size:12px;text-align:right'));
+    tr.appendChild(td(N(bruto,2),'padding:8px 10px;font-size:12px;text-align:right'));
     tr.appendChild(td(N(perda,2),'padding:8px 10px;font-size:12px;text-align:right;color:var(--ts)'));
     tr.appendChild(td(N(fc,2),'padding:8px 10px;font-size:12px;text-align:right'));
     tr.appendChild(td(pct+'%','padding:8px 10px;font-size:12px;text-align:right;color:'+(pct>20?'var(--v)':'var(--ts)')));
@@ -4818,7 +4818,7 @@ function fichaTable(itens,rendQtd,rendUn,custoTotal,custoPorcao,titulo,historico
 
 // Converte quantidade na unidade informada para a unidade base do insumo (g ou ml → kg/L)
 function calcCustoItem(qtdBruta, fc, unQtd, custo_por_unidade, unCusto){
-  const ql=(parseFloat(qtdBruta)||0)/(parseFloat(fc)||1);
+  const ql=(parseFloat(qtdBruta)||0)*(parseFloat(fc)||1);
   const cu=parseFloat(custo_por_unidade)||0;
   // Se a quantidade está em g/ml e o custo é por kg/L → divide por 1000
   if(['g','ml'].includes(unQtd) && ['kg','L'].includes(unCusto)) return (ql/1000)*cu;
