@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Estoque — Lola Bar</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root{--v:#AA2B2B;--ve:#7a1a1a;--rf:#fdf3f3;--rb:#f2dada;--rt:#fde8e8;--rm:#f0b8b8;--tx:#2c1a1a;--ts:#7a5a5a;--vd:#2a6645;--am:#c4852a;}
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -534,6 +535,8 @@ async function pgIns(c){
     c.appendChild(div('abar no-print',[
       mkSearch(q=>{filtBusca=q;drawIns($('#ins-t'));},'Buscar insumo...'),
       div('fl_ gap2',[
+        btn('btn bo bsm','⬇️ Baixar planilha',()=>exportInsumosXlsx()),
+        btn('btn bo bsm','⬆️ Importar planilha',()=>importInsumosXlsx()),
         btn('btn bo bsm','💰 Atualizar preços',()=>modalPrecos()),
         btn('btn bp bsm','+ Novo insumo',()=>modalIns()),
       ])
@@ -5006,6 +5009,101 @@ function mkModal(title,content,onSave,cls){
     if(e.target===ov)ov.remove();
   });
   document.body.appendChild(ov);
+}
+
+/* ── BAIXAR / IMPORTAR PLANILHA DE PREÇOS (1x/mês) ── */
+function _mesAtual(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
+async function _getInsumos(){
+  if(_ins&&_ins.length)return _ins;
+  _ins=await db('lola_insumos','GET',null,'?select=*&ativo=eq.true&order=categoria.asc,nome.asc');
+  return _ins;
+}
+function _parseNum(v){
+  if(v===null||v===undefined||v==='')return null;
+  if(typeof v==='number')return isNaN(v)?null:v;
+  var s=String(v).replace(/[R$\s]/g,'');
+  if(s.indexOf(',')>-1&&s.indexOf('.')>-1){s=s.replace(/\./g,'').replace(',','.');}
+  else if(s.indexOf(',')>-1){s=s.replace(',','.');}
+  var n=parseFloat(s);return isNaN(n)?null:n;
+}
+async function exportInsumosXlsx(){
+  try{
+    if(typeof XLSX==='undefined'){alert('A planilha ainda está carregando. Tente de novo em alguns segundos.');return;}
+    var ins=await _getInsumos();
+    if(!ins.length){alert('Nenhum insumo para exportar.');return;}
+    var rows=ins.map(function(i){return {
+      ID:i.id,
+      Nome:i.nome,
+      Categoria:i.categoria||'',
+      Unidade:i.unidade_custo||'kg',
+      'Custo por unidade (R$)':Number(i.custo_por_unidade||0)
+    };});
+    var ws=XLSX.utils.json_to_sheet(rows,{header:['ID','Nome','Categoria','Unidade','Custo por unidade (R$)']});
+    ws['!cols']=[{wch:8},{wch:36},{wch:22},{wch:10},{wch:22}];
+    var wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,'Precos');
+    XLSX.writeFile(wb,'base-precos-insumos-'+_mesAtual()+'.xlsx');
+  }catch(e){alert('Erro ao gerar a planilha: '+e.message);}
+}
+function importInsumosXlsx(){
+  if(typeof XLSX==='undefined'){alert('A planilha ainda está carregando. Tente de novo em alguns segundos.');return;}
+  var inp=document.createElement('input');
+  inp.type='file';inp.accept='.xlsx,.xls';
+  inp.addEventListener('change',function(){
+    var file=inp.files&&inp.files[0];if(!file)return;
+    var rd=new FileReader();
+    rd.onload=async function(ev){
+      try{
+        var wb=XLSX.read(new Uint8Array(ev.target.result),{type:'array'});
+        var ws=wb.Sheets[wb.SheetNames[0]];
+        var rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+        await _getInsumos();
+        var byId={};_ins.forEach(function(i){byId[String(i.id)]=i;});
+        var byNome={};_ins.forEach(function(i){byNome[(i.nome||'').trim().toLowerCase()]=i;});
+        var changes=[];
+        rows.forEach(function(r){
+          var custoRaw=r['Custo por unidade (R$)'];
+          if(custoRaw===undefined||custoRaw===''){for(var k in r){if(/custo/i.test(k)){custoRaw=r[k];break;}}}
+          var novo=_parseNum(custoRaw);
+          if(novo===null)return;
+          var ins=(r.ID!==undefined&&r.ID!=='')?byId[String(r.ID).trim()]:null;
+          if(!ins&&r.Nome)ins=byNome[String(r.Nome).trim().toLowerCase()];
+          if(!ins)return;
+          var atual=Number(ins.custo_por_unidade||0);
+          if(Math.abs(novo-atual)>0.0001)changes.push({ins:ins,old:atual,novo:novo});
+        });
+        if(!changes.length){alert('Nenhuma mudança de preço encontrada na planilha.');return;}
+        _confirmImport(changes);
+      }catch(e){alert('Não consegui ler a planilha: '+e.message);}
+    };
+    rd.readAsArrayBuffer(file);
+  });
+  inp.click();
+}
+function _confirmImport(changes){
+  var lista=div(null,changes.slice(0,40).map(function(c){
+    var lbl=c.ins.unidade_custo||'kg';
+    return div('fl_ jb aic mt2',[
+      div(null,[el('div','bold',c.ins.nome,{style:'font-size:13px'}),span('tss',c.ins.categoria||'')]),
+      span('tss',R(c.old)+' → '+R(c.novo)+' /'+lbl)
+    ],{style:'padding:8px 12px;background:var(--rf);border-radius:9px;gap:10px'});
+  }));
+  var extra=changes.length>40?div('tss mt2','... e mais '+(changes.length-40)+' insumos.'):null;
+  mkModal('⬆️ Importar preços ('+changes.length+' mudanças)',[
+    div('al ali','Confira as alterações. Ao salvar, o custo desses insumos é atualizado e o histórico registrado.'),
+    lista,extra
+  ],async function(){
+    for(var idx=0;idx<changes.length;idx++){
+      var c=changes[idx];var i=c.ins;
+      var un=i.unidade_compra;var qtd=parseFloat(i.qtd_comprada)||1000;
+      var novoValorPago=un==='g/ml'?c.novo*(qtd/1000):c.novo*qtd;
+      await db('lola_insumos_historico','POST',{insumo_id:i.id,custo_anterior:i.custo_por_unidade,custo_novo:c.novo});
+      await db('lola_insumos','PATCH',{custo_por_unidade:c.novo,valor_pago:novoValorPago},'?id=eq.'+i.id);
+    }
+    _ins=await db('lola_insumos','GET',null,'?select=*&ativo=eq.true&order=categoria.asc,nome.asc');
+    window._drawIns&&window._drawIns(document.getElementById('ins-t'));
+    alert('✅ '+changes.length+' preços atualizados!');
+  },'mo mol');
 }
 
 /* ── INIT ── */
