@@ -587,10 +587,10 @@ async function pgIns(c){
       mkSearch(q=>{filtBusca=q;drawIns($('#ins-t'));},'Buscar insumo...'),
       div('fl_ gap2',[
         btn('btn bo bsm','⬇️ Baixar planilha',()=>exportInsumosXlsx()),
-        btn('btn bo bsm','⬆️ Importar / conferir preços',()=>nav('conferencia')),
+        btn('btn bo bsm','⬆️ Conferir preços',()=>nav('conferencia')),
         btn('btn bo bsm','💰 Atualizar preços',()=>modalPrecos()),
         btn('btn bp bsm','+ Novo insumo',()=>modalIns()),
-      ])
+      ],{style:'flex-wrap:wrap'})
     ]));
     const w=div(null,null,{id:'ins-t'});c.appendChild(w);
     function drawIns(w){
