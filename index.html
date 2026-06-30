@@ -393,6 +393,7 @@ const LOGO_SVG=`<?xml version="1.0" encoding="utf-8"?>
     {s:'Geral',items:[{id:'dashboard',lb:'📊 Cozinha'}]},
     {s:'Cardápio & Custos',items:[
       {id:'insumos',lb:'🧂 Insumos'},
+      {id:'conferencia',lb:'⚖️ Conferência de Preços'},
       {id:'preproducoes',lb:'🍳 Pré-produções'},
       {id:'fichas',lb:'🍽️ Fichas Técnicas'},
     ]},
@@ -418,8 +419,8 @@ const LOGO_SVG=`<?xml version="1.0" encoding="utf-8"?>
 }
 
 
-const TITLES={dashboard:'Cozinha',insumos:'Insumos',preproducoes:'Pré-produções',fichas:'Fichas Técnicas',contagem:'Contagem de Estoque',saidas:'Saída de Estoque',fornecedores:'Fornecedores',pedidos:'Pedidos à Central'};
-const SUBS={dashboard:'Visão geral das operações',insumos:'Ingredientes e matérias-primas com custo real',preproducoes:'Fichas técnicas dos preparos da cozinha',fichas:'Composição e custo dos pratos do cardápio',contagem:'Registro de estoque do CCMQ e Mac',saidas:'Registro de saídas de insumos do estoque',fornecedores:'Cadastro e gestão de fornecedores',pedidos:'Pedidos entre unidades e Cozinha Central'};
+const TITLES={dashboard:'Cozinha',insumos:'Insumos',conferencia:'Conferência de Preços',preproducoes:'Pré-produções',fichas:'Fichas Técnicas',contagem:'Contagem de Estoque',saidas:'Saída de Estoque',fornecedores:'Fornecedores',pedidos:'Pedidos à Central'};
+const SUBS={dashboard:'Visão geral das operações',insumos:'Ingredientes e matérias-primas com custo real',conferencia:'Suba a planilha do mês e confira preço por preço antes de aplicar',preproducoes:'Fichas técnicas dos preparos da cozinha',fichas:'Composição e custo dos pratos do cardápio',contagem:'Registro de estoque do CCMQ e Mac',saidas:'Registro de saídas de insumos do estoque',fornecedores:'Cadastro e gestão de fornecedores',pedidos:'Pedidos entre unidades e Cozinha Central'};
 
 function nav(p){PAGE=p;document.querySelectorAll('.ni').forEach(n=>n.classList.toggle('active',n.dataset.page===p));renderPage();}
 
@@ -442,7 +443,7 @@ async function renderPage(){
   main.innerHTML='';
   main.appendChild(brandHead(TITLES[PAGE],SUBS[PAGE]));
   const body=div(null,null,{id:'pb'});main.appendChild(body);
-  const map={dashboard:pgDash,insumos:pgIns,preproducoes:pgPreps,fichas:pgFichas,contagem:pgCont2,saidas:pgSaidas,fornecedores:pgFornecedores,pedidos:pgPed};
+  const map={dashboard:pgDash,insumos:pgIns,conferencia:pgConferencia,preproducoes:pgPreps,fichas:pgFichas,contagem:pgCont2,saidas:pgSaidas,fornecedores:pgFornecedores,pedidos:pgPed};
   if(map[PAGE])await map[PAGE](body);
 }
 
@@ -586,7 +587,7 @@ async function pgIns(c){
       mkSearch(q=>{filtBusca=q;drawIns($('#ins-t'));},'Buscar insumo...'),
       div('fl_ gap2',[
         btn('btn bo bsm','⬇️ Baixar planilha',()=>exportInsumosXlsx()),
-        btn('btn bo bsm','⬆️ Importar planilha',()=>importInsumosXlsx()),
+        btn('btn bo bsm','⬆️ Importar / conferir preços',()=>nav('conferencia')),
         btn('btn bo bsm','💰 Atualizar preços',()=>modalPrecos()),
         btn('btn bp bsm','+ Novo insumo',()=>modalIns()),
       ])
@@ -625,7 +626,7 @@ function mkInsTable(itens){
     const nm=document.createElement('div');nm.style.cssText='font-size:14px;font-weight:700';nm.textContent=i.nome;
     const meta=document.createElement('div');meta.style.cssText='font-size:11px;color:var(--ts);margin-top:3px;display:flex;gap:10px;flex-wrap:wrap;align-items:center';
     const catBadge=bq(i.categoria.split(' ')[0],'bct');
-    const metaExtra=document.createElement('span');metaExtra.textContent=unCompra+' \u00B7 '+N(i.qtd_comprada,0)+' '+unCompra+' \u00B7 pago: '+R(i.valor_pago);
+    const metaExtra=document.createElement('span');metaExtra.textContent='por '+unCusto;
     meta.appendChild(catBadge);meta.appendChild(metaExtra);
     info.appendChild(nm);info.appendChild(meta);card.appendChild(info);
     const vcusto=document.createElement('div');vcusto.style.cssText='text-align:right;flex-shrink:0';
@@ -795,23 +796,12 @@ function modalIns(item){
 
   const cats=['Bebidas Alcoólicas','Bebidas Não Alcoólicas','Cervejas','Vinhos','Carnes e Pescados','Hortifruti','Insumos Alimentos','Limpeza','Pães'];
 
-  const selUnCompra=fsel('',todasUns,f.unidade_compra,v=>{
-    f.unidade_compra=v;
-    // Ajustar unidade de custo automaticamente
-    if(v==='g') f.unidade_custo='g';
-    else if(v==='ml') f.unidade_custo='ml';
-    else if(v==='kg') f.unidade_custo='kg';
-    else if(v==='L') f.unidade_custo='L';
-    else f.unidade_custo='g'; // para maço, un, cx → padrão g para receitas
-    f_conversao=0;
-    atualizaCusto();
-  });
-  const selCusto=el('select','fs',null);
-  selCusto.addEventListener('change',e=>{f.unidade_custo=e.target.value;f_conversao=0;atualizaCusto();});
-  const inpQtd=finp('',f.qtd_comprada,v=>{f.qtd_comprada=v;atualizaCusto();},'number');
-  const inpVP=finp('',f.valor_pago,v=>{f.valor_pago=v;atualizaCusto();},'number');
-
-  atualizaCusto();
+  const UNS_USO=['kg','g','L','ml','un','cx','pct','maço','dz'];
+  const selCustoU=fsel('',UNS_USO,f.unidade_custo,v=>{f.unidade_custo=v;refLbl();});
+  const inpCustoD=finp('',(f.custo_por_unidade!=null&&f.custo_por_unidade!==0)?f.custo_por_unidade:'',v=>{f.custo_por_unidade=v;},'number');
+  const lblCustoU=document.createElement('div');lblCustoU.style.cssText='font-size:12px;color:var(--ts);margin-top:2px';
+  function refLbl(){lblCustoU.textContent='Custo por '+(f.unidade_custo||'un')+' — a unidade que usamos nas receitas.';}
+  refLbl();
 
   mkModal(ed?'Editar insumo':'Novo insumo',[
     div('fg2',[
@@ -819,24 +809,19 @@ function modalIns(item){
       fgrp('Nome do insumo',finp('',f.nome,v=>f.nome=v)),
     ]),
     div('fg2',[
-      fgrp('Unidade de compra (embalagem)',selUnCompra),
-      fgrp('Unidade que usamos nas receitas',selCusto),
+      fgrp('Unidade que usamos',selCustoU),
+      fgrp('Custo por unidade (R$)',inpCustoD),
     ]),
-    conversaoWrap,
-    div('fg2',[
-      fgrp('Quantidade comprada',inpQtd),
-      fgrp('Valor pago (R$)',inpVP),
-    ]),
-    custoEl,
+    lblCustoU,
   ],async()=>{
-    f.custo_por_unidade=calcCusto();
+    const _custo=parseFloat(String(f.custo_por_unidade).replace(',','.'))||0;
     const p={
       categoria:f.categoria,nome:f.nome,
-      unidade_compra:f.unidade_compra,   // salvar a unidade real (g, ml, kg, L, un...)
+      unidade_compra:f.unidade_custo,
       unidade_custo:f.unidade_custo,
-      qtd_comprada:parseFloat(f.qtd_comprada),
-      valor_pago:parseFloat(f.valor_pago),
-      custo_por_unidade:f.custo_por_unidade
+      qtd_comprada:1,
+      valor_pago:_custo,
+      custo_por_unidade:_custo
     };
     if(ed)await db('lola_insumos','PATCH',p,'?id=eq.'+item.id);
     else await db('lola_insumos','POST',p);
@@ -5153,6 +5138,193 @@ function _confirmImport(changes){
     window._drawIns&&window._drawIns(document.getElementById('ins-t'));
     alert('✅ '+changes.length+' preços atualizados!');
   },'mo mol');
+}
+
+/* ── CONFERÊNCIA DE PREÇOS ── */
+var _CONF=null,_confF='all';
+function _cesc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(ch){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch];});}
+function _confNorm(s){
+  s=String(s||'').toLowerCase();
+  try{s=s.normalize('NFD').replace(/[̀-ͯ]/g,'');}catch(e){}
+  s=s.replace(/_/g,' ').replace(/[^a-z0-9 ]/g,' ');
+  var stop={kg:1,kgs:1,g:1,gr:1,grs:1,grama:1,gramas:1,un:1,und:1,unid:1,unidade:1,unidades:1,l:1,lt:1,litro:1,litros:1,ml:1,molho:1,maco:1,caixa:1,cx:1,pacote:1,pct:1,pc:1,dz:1,duzia:1};
+  var toks=s.split(/\s+/).filter(function(t){return t && !stop[t] && !/^\d+$/.test(t);});
+  return toks.join(' ').trim();
+}
+function _confUn(u){
+  u=String(u||'').toLowerCase().trim();
+  if(/kg|kilo|quilo/.test(u))return 'kg';
+  if(/litro|^l$|^lt$/.test(u))return 'L';
+  if(/ml|mililit/.test(u))return 'ml';
+  if(/^g$|grama|^gr/.test(u))return 'g';
+  if(/unid|^un$|^und|^un\.?$/.test(u))return 'un';
+  if(/caixa|^cx/.test(u))return 'cx';
+  if(/pacote|^pct/.test(u))return 'pct';
+  if(/maco|maço|molho/.test(u))return 'un';
+  if(/duzia|d[uú]zia|^dz/.test(u))return 'dz';
+  return u||'';
+}
+function _confParse(wb){
+  var best={items:[]};
+  wb.SheetNames.forEach(function(sn){
+    var ws=wb.Sheets[sn]; if(!ws)return;
+    var aoa=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+    var nameCol=-1,priceCol=-1,unitCol=-1,hdr=-1;
+    for(var r=0;r<Math.min(aoa.length,20);r++){
+      var row=aoa[r]||[],nc=-1,pc=-1,uc=-1,ci;
+      for(ci=0;ci<row.length;ci++){if(nc<0 && /(descri|nome|insumo|produto|item)/.test(String(row[ci]||'').toLowerCase()))nc=ci;}
+      for(ci=0;ci<row.length;ci++){if(pc<0 && ci!==nc && /(custo|pre[çc]o|valor)/.test(String(row[ci]||'').toLowerCase()))pc=ci;}
+      for(ci=0;ci<row.length;ci++){if(uc<0 && ci!==nc && ci!==pc && /(unid|un\.|medida|base)/.test(String(row[ci]||'').toLowerCase()))uc=ci;}
+      if(pc>=0 && nc>=0 && pc!==nc){nameCol=nc;priceCol=pc;unitCol=uc;hdr=r;break;}
+    }
+    var items=[];
+    if(hdr>=0){
+      for(var r2=hdr+1;r2<aoa.length;r2++){
+        var row2=aoa[r2]||[];
+        var price=_parseNum(row2[priceCol]);
+        var nome=String(row2[nameCol]||'').trim();
+        if(price===null||!nome)continue;
+        if(/descri|nome do insumo|produto/i.test(nome))continue;
+        items.push({nome:nome,custo:price,un:unitCol>=0?String(row2[unitCol]||'').trim():''});
+      }
+    }
+    if(items.length>best.items.length)best={items:items,sheet:sn};
+  });
+  return best;
+}
+function _confBuild(items){
+  var byKey={};
+  items.forEach(function(it){var k=_confNorm(it.nome);if(k && !(k in byKey))byKey[k]=it;});
+  var rows=(_ins||[]).map(function(i){
+    var atual=Number(i.custo_por_unidade||0),atualUn=_confUn(i.unidade_custo||'');
+    var it=byKey[_confNorm(i.nome)];if(it)it._used=true;
+    var status,sheetPrice=null,sheetUn='',newPrice='',newUn=atualUn;
+    if(it){
+      sheetPrice=it.custo;sheetUn=_confUn(it.un);
+      if(sheetUn && atualUn && sheetUn!==atualUn){status='unit';newPrice='';}
+      else{newPrice=sheetPrice;status=(sheetPrice>atual+0.005)?'up':(sheetPrice<atual-0.005)?'down':'eq';}
+    }else{status='none';}
+    return {id:i.id,nome:i.nome,cat:i.categoria||'',atual:atual,atualUn:atualUn,sheetPrice:sheetPrice,sheetUn:sheetUn,status:status,newPrice:newPrice,newUn:newUn,apply:(status==='up'||status==='down')};
+  });
+  var unmatched=items.filter(function(it){return !it._used;}).map(function(it){return it.nome;});
+  return {when:new Date().toISOString(),rows:rows,unmatched:unmatched};
+}
+function _confUpload(c){
+  if(typeof XLSX==='undefined'){alert('A planilha ainda está carregando. Tente de novo em alguns segundos.');return;}
+  var inp=document.createElement('input');inp.type='file';inp.accept='.xlsx,.xls';
+  inp.addEventListener('change',function(){
+    var file=inp.files&&inp.files[0];if(!file)return;
+    var rd=new FileReader();
+    rd.onload=async function(ev){
+      try{
+        var wb=XLSX.read(new Uint8Array(ev.target.result),{type:'array'});
+        var parsed=_confParse(wb);
+        if(!parsed.items.length){alert('Não encontrei colunas de descrição e custo na planilha. Confira se há uma coluna com o nome do insumo e outra com o custo/preço.');return;}
+        await _getInsumos();
+        _CONF=_confBuild(parsed.items);_confF='all';
+        try{localStorage.setItem('lola_conf_precos',JSON.stringify(_CONF));}catch(e){}
+        pgConferencia(c);
+      }catch(e){alert('Não consegui ler a planilha: '+e.message);}
+    };
+    rd.readAsArrayBuffer(file);
+  });
+  inp.click();
+}
+function _confSync(c){
+  if(!_CONF)return;var root=c||document;
+  root.querySelectorAll('.cf-ap').forEach(function(e){var g=+e.dataset.gi;if(_CONF.rows[g])_CONF.rows[g].apply=e.checked;});
+  root.querySelectorAll('.cf-pr').forEach(function(e){var g=+e.dataset.gi;if(_CONF.rows[g])_CONF.rows[g].newPrice=e.value;});
+  root.querySelectorAll('.cf-un').forEach(function(e){var g=+e.dataset.gi;if(_CONF.rows[g])_CONF.rows[g].newUn=e.value;});
+  try{localStorage.setItem('lola_conf_precos',JSON.stringify(_CONF));}catch(e){}
+}
+function _confBadge(r){
+  if(r.status==='none')return '<span style="flex:0 0 auto;background:#FBF0DD;color:#9A6B1E;font-weight:800;font-size:.7rem;padding:4px 9px;border-radius:20px">sem corresp.</span>';
+  if(r.status==='unit')return '<span style="flex:0 0 auto;background:#FBF0DD;color:#9A6B1E;font-weight:800;font-size:.7rem;padding:4px 9px;border-radius:20px">rever un.</span>';
+  if(r.status==='eq')return '<span style="flex:0 0 auto;background:#F1EFE8;color:#6B6258;font-weight:800;font-size:.74rem;padding:4px 9px;border-radius:20px">=</span>';
+  var pct=r.atual>0?Math.round((r.sheetPrice-r.atual)/r.atual*100):100;
+  if(r.status==='up')return '<span style="flex:0 0 auto;background:#FBEAE7;color:#B5302E;font-weight:800;font-size:.74rem;padding:4px 9px;border-radius:20px">↑ +'+pct+'%</span>';
+  return '<span style="flex:0 0 auto;background:#E6F3EA;color:#2C7A4B;font-weight:800;font-size:.74rem;padding:4px 9px;border-radius:20px">↓ '+pct+'%</span>';
+}
+function _confFillList(list){
+  list.innerHTML='';
+  var rows=_CONF.rows.filter(function(r){return _confF==='all'||r.status===_confF;});
+  if(!rows.length){list.innerHTML='<div style="padding:18px;text-align:center;color:var(--ts)">Nada nesta categoria.</div>';return;}
+  list.innerHTML=rows.map(function(r){
+    var gi=_CONF.rows.indexOf(r);
+    var bl=(r.status==='up')?'border-left:4px solid #B5302E;':(r.status==='down')?'border-left:4px solid #2C7A4B;':(r.status==='unit'||r.status==='none')?'border-left:4px solid #9A6B1E;':'';
+    var warn=(r.status==='unit')?'<div style="margin-top:8px;font-size:.72rem;color:#9A6B1E;background:#FBF0DD;border-radius:9px;padding:6px 9px">⚠️ Unidade na planilha: <b>'+_cesc(r.sheetUn||'?')+'</b> ≠ atual: <b>'+_cesc(r.atualUn||'?')+'</b> — confira preço e unidade. R$ '+R(r.sheetPrice).replace('R$','').trim()+' veio na planilha.</div>':'';
+    return '<div style="background:#fff;border:1px solid var(--rb);'+bl+'border-radius:16px;padding:13px 14px;margin-bottom:11px">'+
+      '<div style="display:flex;align-items:flex-start;gap:10px">'+
+        '<label style="flex:0 0 auto;cursor:pointer;margin-top:1px"><input type="checkbox" class="cf-ap" data-gi="'+gi+'" '+(r.apply?'checked':'')+' style="width:20px;height:20px;accent-color:var(--v)"></label>'+
+        '<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:.96rem;color:var(--tx);line-height:1.15">'+_cesc(r.nome)+'</div><div style="font-size:.72rem;color:var(--ts)">'+_cesc(r.cat)+'</div></div>'+
+        _confBadge(r)+
+      '</div>'+
+      '<div style="display:flex;align-items:flex-end;gap:9px;margin-top:11px">'+
+        '<div style="flex:1;background:#FBF7F1;border:1px solid var(--rb);border-radius:11px;padding:7px 10px"><div style="font-size:.58rem;font-weight:700;text-transform:uppercase;color:#B79A8E">Atual</div><div style="font-weight:700;font-size:.9rem;white-space:nowrap">'+R(r.atual)+' /'+_cesc(r.atualUn||'')+'</div></div>'+
+        '<i class="ph-duotone ph-arrow-right" style="color:var(--ts);font-size:1.1rem;margin-bottom:7px"></i>'+
+        '<div style="flex:1.25;background:#fff;border:1.5px solid var(--v);border-radius:11px;padding:6px 9px"><div style="font-size:.58rem;font-weight:700;text-transform:uppercase;color:#B79A8E">Novo /un</div>'+
+          '<div style="display:flex;align-items:center"><input class="cf-pr" data-gi="'+gi+'" inputmode="decimal" value="'+((r.newPrice===''||r.newPrice==null)?'':r.newPrice)+'" placeholder="'+(r.status==='none'?'—':'')+'" style="width:58%;border:0;background:transparent;font-weight:700;font-size:.92rem;color:var(--v);padding:0"><input class="cf-un" data-gi="'+gi+'" value="'+_cesc(r.newUn||'')+'" style="width:42%;border:0;border-left:1px solid var(--rb);background:transparent;font-weight:600;font-size:.78rem;color:var(--tx);padding:2px 0 2px 6px"></div>'+
+        '</div>'+
+      '</div>'+warn+
+    '</div>';
+  }).join('');
+}
+function _confRender(c){
+  var rows=_CONF.rows,cnt={up:0,down:0,eq:0,unit:0,none:0};
+  rows.forEach(function(r){cnt[r.status]=(cnt[r.status]||0)+1;});
+  var res=document.createElement('div');res.style.cssText='display:flex;gap:8px;margin-bottom:13px;flex-wrap:wrap';
+  function rc(n,l,col){return '<div style="flex:1;min-width:72px;background:#fff;border:1px solid var(--rb);border-radius:13px;padding:10px 6px;text-align:center"><div style="font-family:Fraunces,serif;font-weight:600;font-size:1.4rem;line-height:1;color:'+col+'">'+n+'</div><div style="font-size:.6rem;font-weight:700;text-transform:uppercase;color:var(--ts);margin-top:3px">'+l+'</div></div>';}
+  res.innerHTML=rc(cnt.up,'↑ Subiram','#B5302E')+rc(cnt.down,'↓ Baixaram','#2C7A4B')+rc(cnt.eq,'= Iguais','#6B6258')+rc(cnt.unit+cnt.none,'A revisar','#9A6B1E');
+  c.appendChild(res);
+  var defs=[['all','Todos',rows.length],['up','↑ Subiram',cnt.up],['down','↓ Baixaram',cnt.down],['unit','Rever unidade',cnt.unit],['none','Sem corresp.',cnt.none],['eq','Iguais',cnt.eq]];
+  var chips=document.createElement('div');chips.className='no-print';chips.style.cssText='display:flex;gap:7px;overflow-x:auto;padding-bottom:12px';
+  defs.forEach(function(d){var b=document.createElement('button');b.type='button';var on=_confF===d[0];b.style.cssText='flex:0 0 auto;background:'+(on?'var(--v)':'#fff')+';color:'+(on?'#fff':'var(--tx)')+';border:1.5px solid '+(on?'var(--v)':'var(--rb)')+';border-radius:50px;padding:7px 13px;font-weight:700;font-size:.78rem;white-space:nowrap;cursor:pointer';b.textContent=d[1]+' '+d[2];b.addEventListener('click',function(){_confSync(c);_confF=d[0];pgConferencia(c);});chips.appendChild(b);});
+  c.appendChild(chips);
+  var list=document.createElement('div');list.id='confList';c.appendChild(list);
+  _confFillList(list);
+  var ab=document.createElement('div');ab.style.cssText='position:sticky;bottom:0;margin-top:6px;padding:10px 0 4px';
+  var apBtn=btn('btn bp','✅ Aplicar selecionados',function(){_confApply(c);});apBtn.style.cssText='width:100%;padding:13px;font-weight:800';
+  ab.appendChild(apBtn);c.appendChild(ab);
+}
+async function _confApply(c){
+  _confSync(c);
+  var valid=[];
+  _CONF.rows.forEach(function(r){if(r.apply){var n=_parseNum(r.newPrice);if(n!=null&&n>=0)valid.push({r:r,novo:n});}});
+  if(!valid.length){alert('Marque ao menos um item com preço novo válido.');return;}
+  if(!confirm('Aplicar '+valid.length+' preço(s)? O custo será atualizado e o histórico registrado.'))return;
+  var ok=0;
+  for(var i=0;i<valid.length;i++){
+    var r=valid[i].r,novo=valid[i].novo;
+    try{
+      await db('lola_insumos_historico','POST',{insumo_id:r.id,custo_anterior:r.atual,custo_novo:novo});
+      var patch={custo_por_unidade:novo,valor_pago:novo};
+      var nu=_confUn(r.newUn);
+      if(nu && nu!==r.atualUn){patch.unidade_custo=nu;patch.unidade_compra=nu;}
+      await db('lola_insumos','PATCH',patch,'?id=eq.'+r.id);
+      r.atual=novo;if(nu&&nu!==r.atualUn)r.atualUn=nu;r.status='eq';r.apply=false;ok++;
+    }catch(e){}
+  }
+  _ins=await db('lola_insumos','GET',null,'?select=*&ativo=eq.true&order=categoria.asc,nome.asc');
+  try{localStorage.setItem('lola_conf_precos',JSON.stringify(_CONF));}catch(e){}
+  alert('✅ '+ok+' preço(s) atualizados!');
+  pgConferencia(c);
+}
+function pgConferencia(c){
+  c.innerHTML='';
+  if(!_CONF){try{var s=localStorage.getItem('lola_conf_precos');if(s)_CONF=JSON.parse(s);}catch(e){}}
+  var bar=div('no-print');bar.style.cssText='display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin:6px 0 14px';
+  bar.appendChild(btn('btn bp',(_CONF?'⬆️ Subir outra planilha':'⬆️ Subir planilha de preços'),function(){_confUpload(c);}));
+  if(_CONF){
+    bar.appendChild(btn('btn bo bsm','🗑️ Limpar',function(){if(!confirm('Limpar a conferência atual?'))return;_CONF=null;try{localStorage.removeItem('lola_conf_precos');}catch(e){}pgConferencia(c);}));
+    var inf=span('tss','Conferência de '+(_CONF.when?new Date(_CONF.when).toLocaleString('pt-BR'):''));bar.appendChild(inf);
+  }
+  c.appendChild(bar);
+  if(!_CONF){
+    var hint=div(null);hint.style.cssText='background:#fff;border:1.5px dashed var(--v);border-radius:14px;padding:18px;color:var(--ts);font-size:13px;line-height:1.6';
+    hint.innerHTML='Suba a planilha de preços do mês (.xlsx). O sistema casa por <b>nome do insumo</b>, mostra <b>preço atual × preço novo</b> e a <b>unidade</b>, indica se <b>subiu/baixou</b> e deixa você conferir e editar item a item antes de aplicar. As colunas (Descrição / Custo / Unidade) são detectadas automaticamente.';
+    c.appendChild(hint);return;
+  }
+  _confRender(c);
 }
 
 /* ── INIT ── */
