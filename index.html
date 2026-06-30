@@ -2541,105 +2541,100 @@ async function pgSaidas(c){
   try{
     c.innerHTML='';
     let _filtroSetor='';
-    const bar=div('abar no-print');
-    const btnNova=btn('btn bp','+ Nova saída',()=>modalNovaSaida(()=>pgSaidas(c)));
-    btnNova.style.cssText='padding:10px 22px;font-size:13px;font-weight:800;box-shadow:0 3px 10px rgba(170,43,43,.3)';
-    bar.appendChild(btnNova);
-    c.appendChild(bar);
 
     const itens=await db('lola_saidas_itens','GET',null,
       '?select=*,lola_saidas!saida_id(id,data_saida,responsavel,destino,observacoes),lola_estoque_itens!estoque_item_id(nome,unidade,categoria)&order=lola_saidas(data_saida).desc');
+
+    // + Nova saída na faixa + subtítulo dinâmico (page-specific, não mexe no brandHead)
+    try{
+      var _hoje=new Date().toISOString().split('T')[0];
+      var _sH={},_setU={};
+      itens.forEach(function(it){ if(it.lola_saidas&&it.lola_saidas.data_saida===_hoje)_sH[it.lola_saidas.id]=1; if(it.setor)_setU[it.setor]=1; });
+      var _nS=Object.keys(_sH).length,_nU=Object.keys(_setU).length;
+      var _sub=document.querySelector('.bhead-sub');
+      if(_sub)_sub.textContent=_nS+' saída'+(_nS===1?'':'s')+' hoje · '+_nU+' setor'+(_nU===1?'':'es');
+      var _acts=document.querySelector('.bhead-acts');
+      if(_acts&&!document.getElementById('btnNovaSaida')){
+        var _bn=el('button',null,null,{html:'<i class="ph-duotone ph-plus"></i> Nova',onclick:function(){modalNovaSaida(function(){pgSaidas(c);});}});
+        _bn.id='btnNovaSaida';
+        _bn.style.cssText='display:inline-flex;align-items:center;gap:6px;background:#fff;color:var(--v);border:0;border-radius:13px;padding:9px 14px;font-family:Hanken Grotesk,sans-serif;font-weight:700;font-size:13px;cursor:pointer';
+        _acts.appendChild(_bn);
+      }
+    }catch(_e){}
 
     if(!itens.length){
       c.appendChild(em('📤','Nenhuma saída registrada ainda'));
       return;
     }
 
-    const destLabels={venda:'🛍️ Venda',evento:'🎪 Evento',descarte:'🗑️ Descarte',outro:'📦 Outro'};
+    function _esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(ch){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch];});}
+    var SET_STY={'Cozinha':['ph-cooking-pot','#FBEAE7','#B5302E'],'Bar':['ph-martini','#EFE6F6','#7A4FA3'],'Salão':['ph-armchair','#FBF0DD','#9A6B1E'],'Manutenção':['ph-wrench','#F1EFE8','#6B6258']};
+    var DEST_STY={venda:['Venda','ph-storefront','#E6F3EA','#2C7A4B'],evento:['Evento','ph-confetti','#FBF0DD','#9A6B1E'],descarte:['Descarte','ph-trash','#FBEAE7','#B5302E'],outro:['Outro','ph-package','#F1EFE8','#6B6258']};
+    var CAT_STY={limpeza:['ph-spray-bottle','#F1EFE8','#6B6258'],paes:['ph-bread','#FBF0DD','#9A6B1E'],hortifruti:['ph-leaf','#E6F3EA','#2C7A4B'],carnes:['ph-cow','#FBEAE7','#B5302E'],resfriados:['ph-snowflake','#E6EEF8','#2C5AA0'],secos:['ph-package','#F3ECD9','#8A6A2B'],bebidas:['ph-drop','#E6EEF8','#2C5AA0'],bebidas_alc:['ph-martini','#FBF0DD','#9A6B1E'],cervejas:['ph-beer-stein','#FBF0DD','#9A6B1E'],chopp:['ph-beer-bottle','#FBF0DD','#9A6B1E'],vinhos_espumantes:['ph-wine','#EFE6F6','#7A4FA3'],vinhos_brancos:['ph-wine','#EFE6F6','#7A4FA3'],vinhos_roses:['ph-wine','#FBEAF0','#B23A6B'],vinhos_tintos:['ph-wine','#EFE6F6','#7A4FA3']};
+    function _catLabel(k){var v=CONT_CATS[k]||k||'';return v.replace(/^[^\s]+\s/,'');}
 
-    // Filtro por setor (centro de custo)
-    const filtroWrap=div('no-print');
-    filtroWrap.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0 10px';
-    const chips=[{v:'',t:'Todos os setores'}].concat(SAIDA_SETORES.map(x=>({v:x,t:setorLabel(x)})));
-    const chipRenders=[];
-    chips.forEach(o=>{
-      const ch=document.createElement('button');ch.type='button';
-      function rc(){const sel=_filtroSetor===o.v;ch.style.cssText='padding:5px 13px;border-radius:50px;border:2px solid '+(sel?'var(--v)':'var(--rb)')+';cursor:pointer;font-family:Hanken Grotesk,sans-serif;font-size:12px;font-weight:700;transition:all .15s;'+(sel?'background:var(--v);color:#fff':'background:#fff;color:var(--tx)');ch.textContent=o.t;}
+    // chips de setor (uma linha, rolam de lado, com contagem)
+    var cont={}; itens.forEach(function(it){var k=it.setor||'__none';cont[k]=(cont[k]||0)+1;});
+    var chipsWrap=document.createElement('div');
+    chipsWrap.className='no-print';
+    chipsWrap.style.cssText='display:flex;gap:8px;overflow-x:auto;padding:4px 0 12px;-webkit-overflow-scrolling:touch';
+    var chipDefs=[{v:'',t:'Todos',ic:'ph-squares-four',n:itens.length}].concat(SAIDA_SETORES.map(function(x){return {v:x,t:x,ic:(SET_STY[x]||['ph-tag'])[0],n:cont[x]||0};}));
+    var chipRenders=[];
+    chipDefs.forEach(function(o){
+      var ch=document.createElement('button');ch.type='button';
+      function rc(){var sel=_filtroSetor===o.v;ch.style.cssText='flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:50px;border:1.5px solid '+(sel?'var(--v)':'var(--rb)')+';cursor:pointer;font-family:Hanken Grotesk,sans-serif;font-size:13px;font-weight:700;white-space:nowrap;'+(sel?'background:var(--v);color:#fff':'background:#fff;color:var(--tx)');ch.innerHTML='<i class="ph-duotone '+o.ic+'" style="font-size:16px"></i> '+_esc(o.t)+' <b style="opacity:.82">'+o.n+'</b>';}
       rc();chipRenders.push(rc);
-      ch.addEventListener('click',()=>{_filtroSetor=o.v;chipRenders.forEach(f=>f());renderLista();});
-      filtroWrap.appendChild(ch);
+      ch.addEventListener('click',function(){_filtroSetor=o.v;chipRenders.forEach(function(f){f();});renderLista();});
+      chipsWrap.appendChild(ch);
     });
-    c.appendChild(filtroWrap);
+    c.appendChild(chipsWrap);
 
-    // Resumo de itens por setor (centro de custo)
-    const resumoSetor=div(null);
-    resumoSetor.style.cssText='font-size:12px;color:var(--ts);margin-bottom:10px';
-    c.appendChild(resumoSetor);
-
-    const listaWrap=div(null);
+    var listaWrap=div(null);
     c.appendChild(listaWrap);
+
+    function mkSaidaCard(it){
+      var cat=it.lola_estoque_itens?it.lola_estoque_itens.categoria:null;
+      var saida=it.lola_saidas||{};
+      var nome=(it.lola_estoque_itens&&it.lola_estoque_itens.nome)||it.nome_item||'—';
+      var un=it.unidade||(it.lola_estoque_itens&&it.lola_estoque_itens.unidade)||'';
+      var qt=N(it.quantidade,1);
+      var card=document.createElement('div');
+      card.style.cssText='background:#fff;border:1px solid var(--rb);border-radius:18px;padding:14px 15px;margin-bottom:12px;cursor:pointer;box-shadow:0 1px 2px rgba(42,26,23,.05),0 12px 26px -18px rgba(42,26,23,.22)';
+      var catS=cat?(CAT_STY[cat]||['ph-tag','#F1EFE8','#6B6258']):null;
+      var catPill=cat?'<span style="display:inline-flex;align-items:center;gap:5px;font-weight:600;font-size:.74rem;padding:4px 10px;border-radius:10px;margin-top:9px;background:'+catS[1]+';color:'+catS[2]+'"><i class="ph-duotone '+catS[0]+'" style="font-size:.95rem"></i> '+_esc(_catLabel(cat))+'</span>':'';
+      var setS=it.setor?(SET_STY[it.setor]||['ph-tag','#F1EFE8','#6B6258']):null;
+      var setTag=it.setor?'<span style="display:inline-flex;align-items:center;gap:5px;font-weight:600;font-size:.76rem;padding:5px 11px;border-radius:10px;background:'+setS[1]+';color:'+setS[2]+'"><i class="ph-duotone '+setS[0]+'" style="font-size:.95rem"></i> '+_esc(it.setor)+'</span>':'<span style="display:inline-flex;align-items:center;gap:5px;font-weight:600;font-size:.76rem;padding:5px 11px;border-radius:10px;background:#F1EFE8;color:#6B6258">—</span>';
+      var d=saida.destino,dS=DEST_STY[d]||[d||'—','ph-package','#F1EFE8','#6B6258'];
+      var destTag='<span style="display:inline-flex;align-items:center;gap:5px;font-weight:600;font-size:.76rem;padding:5px 11px;border-radius:10px;background:'+dS[2]+';color:'+dS[3]+'"><i class="ph-duotone '+dS[1]+'" style="font-size:.95rem"></i> '+_esc(dS[0])+'</span>';
+      card.innerHTML=
+        '<div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">'+
+          '<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:1.02rem;color:var(--tx);line-height:1.2">'+_esc(nome)+'</div>'+catPill+'</div>'+
+          '<div style="flex:0 0 auto;text-align:center;background:#FBEAE7;border-radius:14px;padding:8px 14px;min-width:60px"><div style="font-family:Fraunces,serif;font-weight:600;font-size:1.5rem;line-height:1;color:var(--v)">'+qt+'</div><div style="font-size:.66rem;color:#7E1E1F;margin-top:1px">'+_esc(un)+'</div></div>'+
+        '</div>'+
+        '<div style="height:1px;background:var(--rb);margin:13px 0 11px"></div>'+
+        '<div style="display:flex;gap:10px">'+
+          '<div style="flex:1;min-width:0"><div style="font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:#B79A8E;margin-bottom:5px">Setor</div>'+setTag+'</div>'+
+          '<div style="flex:1;min-width:0"><div style="font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:#B79A8E;margin-bottom:5px">Destino</div>'+destTag+'</div>'+
+        '</div>';
+      card.addEventListener('click',function(){ if(saida&&saida.id) modalEditarSaida(saida,function(){pgSaidas(c);}); });
+      return card;
+    }
 
     function renderLista(){
       listaWrap.innerHTML='';
-      const filtrados=_filtroSetor?itens.filter(it=>(it.setor||'')===_filtroSetor):itens;
-
-      const cont={};
-      itens.forEach(it=>{const k=it.setor||'__none';cont[k]=(cont[k]||0)+1;});
-      resumoSetor.textContent='Itens por setor:  '+SAIDA_SETORES.map(x=>setorLabel(x)+' '+(cont[x]||0)).join('   ')+(cont['__none']?'   Sem setor '+cont['__none']:'');
-
+      var filtrados=_filtroSetor?itens.filter(function(it){return (it.setor||'')===_filtroSetor;}):itens;
       if(!filtrados.length){listaWrap.appendChild(em('📤','Nenhuma saída neste setor'));return;}
-
-      const porData={};
-      filtrados.forEach(it=>{const data=it.lola_saidas?.data_saida||'';if(!porData[data])porData[data]=[];porData[data].push(it);});
-
-      Object.entries(porData).sort(([a],[b])=>b.localeCompare(a)).forEach(([data,dItens])=>{
-        const dataFmt=new Date(data+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
-        const hdr=document.createElement('div');
-        hdr.style.cssText='display:flex;align-items:center;justify-content:space-between;margin:18px 0 8px;padding-bottom:6px;border-bottom:2px solid var(--rb)';
-        const hdrLeft=document.createElement('div');
-        hdrLeft.style.cssText='font-size:14px;font-weight:800;color:var(--v)';
-        hdrLeft.textContent=dataFmt.charAt(0).toUpperCase()+dataFmt.slice(1);
-        const saidas=dItens.map(it=>it.lola_saidas).filter((sx,i,a)=>a.findIndex(x=>x?.id===sx?.id)===i);
-        const hdrRight=document.createElement('div');
-        hdrRight.style.cssText='font-size:11px;color:var(--ts);text-align:right';
-        hdrRight.textContent=dItens.length+' item'+(dItens.length>1?'s':'')+' · '+saidas.map(sx=>sx.responsavel).join(', ');
-        hdr.appendChild(hdrLeft);hdr.appendChild(hdrRight);
-        listaWrap.appendChild(hdr);
-
-        const twSaidas=div('tw mb3');
-        listaWrap.appendChild(twSaidas);
-        const tblS=mkTable(
-          ['Item','Categoria','Qtd','Un','Setor','Destino','Responsável',''],
-          dItens.map((it,_si)=>{
-            const cat=it.lola_estoque_itens?.categoria;
-            const saida=it.lola_saidas;
-            const isFirst=_si===0||dItens[_si-1].lola_saidas?.id!==saida?.id;
-            let acoesSaida;
-            if(isFirst){
-              acoesSaida=div('fl_ gap2');
-              acoesSaida.appendChild(btn('btn bg bsm','✏️',()=>modalEditarSaida(saida,()=>pgSaidas(c))));
-              acoesSaida.appendChild(btn('btn bd bsm','🗑️',async()=>{
-                if(!confirm('Excluir esta saída de '+new Date((saida?.data_saida||'')+'T12:00:00').toLocaleDateString('pt-BR')+'?'))return;
-                await db('lola_saidas_itens','DELETE',null,'?saida_id=eq.'+saida.id);
-                await db('lola_saidas','DELETE',null,'?id=eq.'+saida.id);
-                pgSaidas(c);
-              }));
-            } else {acoesSaida=div(null);}
-            return[
-              el('strong',null,it.lola_estoque_itens?.nome||it.nome_item||'—'),
-              cat?el('span','tss',CONT_CATS[cat]||cat):span('tss','—'),
-              el('span','bold tv',N(it.quantidade,1)),
-              it.unidade||it.lola_estoque_itens?.unidade||'—',
-              el('span','tss',setorLabel(it.setor)),
-              el('span','tss',destLabels[saida?.destino]||saida?.destino||'—'),
-              el('span','tss',saida?.responsavel||'—'),
-              acoesSaida,
-            ];
-          }),
-          [null,null,'tr','tr',null,null,null,null]
-        );
-        tblS.classList.add('tbl-saidas');
-        twSaidas.appendChild(tblS);
+      var porData={};
+      filtrados.forEach(function(it){var data=(it.lola_saidas&&it.lola_saidas.data_saida)||'';if(!porData[data])porData[data]=[];porData[data].push(it);});
+      Object.entries(porData).sort(function(a,b){return b[0].localeCompare(a[0]);}).forEach(function(ent){
+        var data=ent[0],dItens=ent[1];
+        var dataFmt;
+        if(data){var dd=new Date(data+'T12:00:00');var wd=dd.toLocaleDateString('pt-BR',{weekday:'long'});var dm=dd.toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}).replace('.','').replace(' de ',' ');dataFmt=wd.charAt(0).toUpperCase()+wd.slice(1)+', '+dm;}else{dataFmt='Sem data';}
+        var sep=document.createElement('div');
+        sep.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:10px;margin:16px 2px 11px;padding-bottom:7px;border-bottom:2px solid var(--rb)';
+        sep.innerHTML='<span style="font-family:Fraunces,serif;font-weight:600;font-size:1.12rem;color:var(--v)">'+_esc(dataFmt)+'</span><span style="flex:0 0 auto;background:#fff;border:1px solid var(--rb);border-radius:20px;padding:3px 11px;font-size:.72rem;font-weight:700;color:var(--tx)">'+dItens.length+' '+(dItens.length===1?'item':'itens')+'</span>';
+        listaWrap.appendChild(sep);
+        dItens.forEach(function(it){listaWrap.appendChild(mkSaidaCard(it));});
       });
     }
 
