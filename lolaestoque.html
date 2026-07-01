@@ -64,6 +64,25 @@ body{font-family:'Hanken Grotesk',sans-serif;background:var(--rf);color:var(--tx
 .ins-btns{display:flex;gap:6px;margin-top:10px;}
 .ins-ab{flex:1;height:38px;background:#F7F1EA;border:1px solid var(--rb);border-radius:11px;color:var(--v);font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
 .ins-ab.del{background:#FBEAE7;border-color:#F3D3CE;color:#B5302E;}
+/* PEDIDO CARD (v2) */
+.ped-card{background:#fff;border:1px solid var(--rb);border-radius:16px;padding:13px 14px;margin-bottom:10px;box-shadow:0 1px 2px rgba(42,26,23,.05);}
+.ped-top{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.ped-numwrap{display:flex;align-items:center;gap:8px;min-width:0;}
+.ped-num{font-family:'Fraunces',serif;font-weight:600;font-size:16px;color:var(--v);}
+.ped-val{font-family:'Fraunces',serif;font-size:17px;font-weight:600;color:var(--v);white-space:nowrap;}
+.ped-meta{font-size:12px;color:#8A7A72;margin-top:3px;}
+.ped-status{margin-top:10px;}
+.ped-btns{display:flex;gap:6px;margin-top:11px;justify-content:flex-end;flex-wrap:wrap;}
+.ped-ab{height:34px;padding:0 14px;background:#F7F1EA;border:1px solid var(--rb);border-radius:10px;color:var(--v);font-size:12px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap;cursor:pointer;font-family:'Hanken Grotesk',sans-serif;}
+.ped-ab i{font-size:15px;flex-shrink:0;}
+.ped-ab.recv{background:#E6F3EA;border-color:#C9E6D4;color:#2C7A4B;}
+.ped-ab.send{background:var(--v);border-color:var(--v);color:#fff;}
+.ped-ab.warn{background:#FBF0DD;border-color:#F1DFB8;color:#9A6B1E;}
+@media(max-width:768px){
+  .ped-btns{flex-wrap:nowrap;gap:5px;justify-content:stretch;}
+  .ped-ab{flex:1 1 0;min-width:0;padding:0;font-size:11px;overflow:hidden;}
+  .ped-ab i{font-size:14px;}
+}
 /* BUTTONS */
 .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 18px;border-radius:50px;border:none;cursor:pointer;font-family:'Hanken Grotesk',sans-serif;font-size:12.5px;font-weight:700;transition:all .15s;white-space:nowrap;}
 .bp{background:var(--v);color:#fff;} .bp:hover{background:var(--ve);}
@@ -3856,78 +3875,68 @@ function drawPed(w){
   w.innerHTML='';
   const f=pedFiltrados();
   if(!f.length){w.appendChild(em('📋','Nenhum pedido encontrado'));return;}
-  w.appendChild(div('tw',mkTable(
-    ['Nº','Destino','Data','Observações','Status','Total',''],
-    f.map(p=>{
-      // Select de status com cor dinâmica
-      const STATUS_COLORS={
-        rascunho:'background:#f1f5f9;color:#64748b',
-        em_producao:'background:#dbeafe;color:#1d4ed8',
-        pronto_entrega:'background:#fef3c7;color:#92400e',
-        recebido_completo:'background:#dcfce7;color:#166534',
-        recebido_divergencia:'background:#fef3c7;color:#92400e',
-        cancelado:'background:#fee2e2;color:#dc2626',
-        solicitado:'background:#dbeafe;color:#1d4ed8',
-        confirmado:'background:#fef3c7;color:#92400e',
-        entregue:'background:#f3e8ff;color:#7c3aed',
-      };
-      // Rascunho: mostrar badge simples sem select (não pode mudar status)
-      let statusEl;
-      if(p.status==='rascunho'){
-        statusEl=bq('📝 Rascunho','bct');
-      } else {
-        const sel=document.createElement('select');
-        function applySelStyle(status){
-          sel.style.cssText='padding:6px 12px;font-size:12px;font-weight:700;border-radius:50px;border:none;cursor:pointer;font-family:Hanken Grotesk,sans-serif;min-width:130px;'+(STATUS_COLORS[status]||'');
-        }
-        applySelStyle(p.status);
-        ['em_producao','pronto_entrega','recebido_completo','recebido_divergencia','cancelado'].forEach(s=>{
-          const o=document.createElement('option');o.value=s;o.textContent={em_producao:'Em produção',pronto_entrega:'Pronto para entrega',recebido_completo:'Recebido completo',recebido_divergencia:'Recebido c/ diverg.',cancelado:'Cancelado',solicitado:'Em produção',confirmado:'Pronto para entrega',entregue:'Entregue'}[s]||s;
-          if(s===p.status)o.selected=true;sel.appendChild(o);
-        });
-        sel.addEventListener('change',async e=>{
-          await db('lola_pedidos','PATCH',{status:e.target.value},'?id=eq.'+p.id);
-          p.status=e.target.value;
-          applySelStyle(e.target.value);
-        });
-        statusEl=sel;
-      }
-      const destLabel=p.unidade==='ccmq'?'CCMQ':p.unidade==='mac'?'Mac':(p.destinatario||p.unidade||'—');
-      return[
-        el('strong',null,'#'+p.numero_pedido),
-        bq(destLabel,p.unidade==='ccmq'?'bc':p.unidade==='mac'?'bm':'bev'),
-        DBR(p.data_pedido),
-        el('span','tss',p.responsavel||p.observacoes||''),
-        statusEl,
-        el('span','bold tv',R(p.valor_total)),
-        (()=>{
-          const wrap=div('fl_ gap2');
-          wrap.appendChild(btn('btn bg bsm','📋 Ver',()=>verPedido(p)));
-          wrap.appendChild(btn('btn bg bsm','✏️',()=>editarPedido(p)));
-          if(p.status==='rascunho'){
-            const envBtn=btn('btn bv bsm','📤 Enviar',async()=>{
-              if(!confirm('Enviar pedido #'+p.numero_pedido+' para a Central?'))return;
-              await db('lola_pedidos','PATCH',{status:'solicitado'},'?id=eq.'+p.id);
-              p.status='solicitado';
-              _peds=await db('lola_pedidos','GET',null,'?select=*&order=created_at.desc');
-              drawPed($('#ped-t'));
-            });
-            wrap.appendChild(envBtn);
-          } else if(p.status==='em_producao'||p.status==='pronto_entrega'||p.status==='solicitado'||p.status==='confirmado'){
-            wrap.appendChild(btn('btn bo bsm','📥 Receber',()=>registrarRecebimento(p)));
-            wrap.appendChild(btn('btn bo bsm no-print','🖨️',()=>imprimirPed(p)));
-          } else if(p.status==='recebido_divergencia'){
-            wrap.appendChild(btn('btn bo bsm','⚠️ Diverg.',()=>verDivergencias(p,null,null,null)));
-            wrap.appendChild(btn('btn bo bsm no-print','🖨️',()=>imprimirPed(p)));
-          } else {
-            wrap.appendChild(btn('btn bo bsm no-print','🖨️',()=>imprimirPed(p)));
-          }
-          return wrap;
-        })()
-      ];
-    }),
-    [null,null,null,null,null,'tr',null]
-  )));
+  const STATUS_COLORS={
+    rascunho:'background:#F1EEE9;color:#6B6258',
+    em_producao:'background:#E6EEF8;color:#2C5AA0',
+    pronto_entrega:'background:#FBF0DD;color:#9A6B1E',
+    recebido_completo:'background:#E6F3EA;color:#2C7A4B',
+    recebido_divergencia:'background:#FBF0DD;color:#9A6B1E',
+    cancelado:'background:#FBEAE7;color:#B5302E',
+    solicitado:'background:#E6EEF8;color:#2C5AA0',
+    confirmado:'background:#FBF0DD;color:#9A6B1E',
+    entregue:'background:#F1E7FA;color:#6B4FA8',
+  };
+  const STATUS_LBL={em_producao:'Em produção',pronto_entrega:'Pronto para entrega',recebido_completo:'Recebido completo',recebido_divergencia:'Recebido c/ diverg.',cancelado:'Cancelado',solicitado:'Em produção',confirmado:'Pronto para entrega',entregue:'Entregue'};
+  const wrap=document.createElement('div');
+  f.forEach(p=>{
+    const card=div('ped-card');
+    const destLabel=p.unidade==='ccmq'?'CCMQ':p.unidade==='mac'?'Mac':(p.destinatario||p.unidade||'—');
+    card.appendChild(div('ped-top',[
+      div('ped-numwrap',[el('span','ped-num','#'+p.numero_pedido),bq(destLabel,p.unidade==='ccmq'?'bc':p.unidade==='mac'?'bm':'bev')]),
+      el('span','ped-val',R(p.valor_total))
+    ]));
+    card.appendChild(div('ped-meta',[DBR(p.data_pedido)+(p.responsavel?(' · por '+p.responsavel):(p.observacoes?(' · '+p.observacoes):''))]));
+    // status
+    const st=div('ped-status');
+    if(p.status==='rascunho'){
+      st.appendChild(el('span',null,null,{html:'<i class="ph-duotone ph-note-pencil"></i> Rascunho',style:'display:inline-flex;align-items:center;gap:6px;background:#F1EEE9;color:#6B6258;font-size:12px;font-weight:700;padding:7px 12px;border-radius:11px'}));
+    } else {
+      const sel=document.createElement('select');
+      function applySelStyle(status){sel.style.cssText='padding:8px 13px;font-size:12px;font-weight:700;border-radius:11px;border:none;cursor:pointer;font-family:Hanken Grotesk,sans-serif;'+(STATUS_COLORS[status]||'');}
+      applySelStyle(p.status);
+      ['em_producao','pronto_entrega','recebido_completo','recebido_divergencia','cancelado'].forEach(s=>{
+        const o=document.createElement('option');o.value=s;o.textContent=STATUS_LBL[s]||s;if(s===p.status)o.selected=true;sel.appendChild(o);
+      });
+      sel.addEventListener('change',async e=>{await db('lola_pedidos','PATCH',{status:e.target.value},'?id=eq.'+p.id);p.status=e.target.value;applySelStyle(e.target.value);});
+      st.appendChild(sel);
+    }
+    card.appendChild(st);
+    // botões (compactos, 1 linha)
+    const btns=div('ped-btns');
+    const pab=(ic,lb,extra,fn)=>el('button','ped-ab'+(extra?' '+extra:''),null,{html:'<i class="ph-duotone '+ic+'"></i> '+lb,onclick:fn});
+    btns.appendChild(pab('ph-eye','Ver','',()=>verPedido(p)));
+    btns.appendChild(pab('ph-pencil-simple','Editar','',()=>editarPedido(p)));
+    if(p.status==='rascunho'){
+      btns.appendChild(pab('ph-paper-plane-tilt','Enviar','send',async()=>{
+        if(!confirm('Enviar pedido #'+p.numero_pedido+' para a Central?'))return;
+        await db('lola_pedidos','PATCH',{status:'solicitado'},'?id=eq.'+p.id);
+        p.status='solicitado';
+        _peds=await db('lola_pedidos','GET',null,'?select=*&order=created_at.desc');
+        drawPed($('#ped-t'));
+      }));
+    } else if(p.status==='em_producao'||p.status==='pronto_entrega'||p.status==='solicitado'||p.status==='confirmado'){
+      btns.appendChild(pab('ph-tray-arrow-down','Receber','recv',()=>registrarRecebimento(p)));
+      btns.appendChild(pab('ph-printer','Imprimir','',()=>imprimirPed(p)));
+    } else if(p.status==='recebido_divergencia'){
+      btns.appendChild(pab('ph-warning','Diverg.','warn',()=>verDivergencias(p,null,null,null)));
+      btns.appendChild(pab('ph-printer','Imprimir','',()=>imprimirPed(p)));
+    } else {
+      btns.appendChild(pab('ph-printer','Imprimir','',()=>imprimirPed(p)));
+    }
+    card.appendChild(btns);
+    wrap.appendChild(card);
+  });
+  w.appendChild(wrap);
 }
 
 let _pedTab='todos',_peds=[],_pedMes='';
@@ -4020,11 +4029,11 @@ async function pgPed(c){
 
     async function recarregarPedidos(){
       const btnRef=$('#btn-refresh-ped');
-      if(btnRef){btnRef.textContent='⏳';btnRef.disabled=true;}
+      if(btnRef){btnRef.innerHTML='<i class="ph-duotone ph-circle-notch"></i> Atualizando';btnRef.disabled=true;}
       _peds=await db('lola_pedidos','GET',null,'?select=*&order=created_at.desc');
       atualizaResumo();
       drawPed($('#ped-t'));
-      if(btnRef){btnRef.textContent='🔄 Atualizar';btnRef.disabled=false;}
+      if(btnRef){btnRef.innerHTML='<i class="ph-duotone ph-arrows-clockwise"></i> Atualizar';btnRef.disabled=false;}
     }
 
     // Montar barra manualmente para evitar null nodes
@@ -4036,10 +4045,10 @@ async function pgPed(c){
     tabsGrupo.appendChild(tabsEl);
     barraTopo.appendChild(tabsGrupo);
     const btnsDir=div('fl_ gap2');
-    const bAtualizar=btn('btn bo bsm','🔄 Atualizar',recarregarPedidos);
+    const bAtualizar=el('button','btn bo bsm',null,{html:'<i class="ph-duotone ph-arrows-clockwise"></i> Atualizar',onclick:recarregarPedidos});
     bAtualizar.id='btn-refresh-ped';
     btnsDir.appendChild(bAtualizar);
-    const bNovo=btn('btn bp','+ Novo pedido',()=>modalNovoPedido());
+    const bNovo=el('button','btn bp',null,{html:'<i class="ph-duotone ph-plus"></i> Novo pedido',onclick:()=>modalNovoPedido()});
     bNovo.style.cssText='padding:10px 22px;font-size:13px;font-weight:800;letter-spacing:.5px;box-shadow:0 3px 10px rgba(170,43,43,.3)';
     btnsDir.appendChild(bNovo);
     barraTopo.appendChild(btnsDir);
