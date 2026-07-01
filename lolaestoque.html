@@ -2904,7 +2904,7 @@ async function pgFornecedores(c){
     const bar=div('abar no-print');
     const srchEl=mkSearch(q=>drawForn(w,q),'Buscar fornecedor...');
     bar.appendChild(srchEl);
-    const btnNovo=btn('btn bp','+ Novo fornecedor',()=>modalFornecedor(null,()=>pgFornecedores(c)));
+    const btnNovo=el('button','btn bp',null,{html:'<i class="ph-duotone ph-plus"></i> Novo fornecedor',onclick:()=>modalFornecedor(null,()=>pgFornecedores(c))});
     btnNovo.style.cssText='padding:10px 22px;font-size:13px;font-weight:800;box-shadow:0 3px 10px rgba(170,43,43,.3)';
     bar.appendChild(btnNovo);
     c.appendChild(bar);
@@ -3162,22 +3162,22 @@ function drawForn(w,busca){
     const cats=(forn.categorias||[]).map(c=>CONT_CATS[c]||c).join(', ');
     const wp=(forn.whatsapp||forn.telefone||'').replace(/\D/g,'');
     const card=document.createElement('div');
-    card.style.cssText='background:#fff;border:1.5px solid var(--rb);border-radius:14px;padding:14px 16px;margin-bottom:10px';
+    card.style.cssText='background:#fff;border:1px solid var(--rb);border-radius:16px;padding:14px 16px;margin-bottom:10px;box-shadow:0 1px 2px rgba(42,26,23,.05)';
     const nomeEl=document.createElement('div');nomeEl.style.cssText='margin-bottom:4px';
     nomeEl.innerHTML='<strong style="font-size:15px">'+forn.nome+'</strong>'+(forn.email?'<div style="font-size:11px;color:var(--ts);margin-top:2px">'+forn.email+'</div>':'');
     card.appendChild(nomeEl);
     if(cats){const catEl=document.createElement('div');catEl.style.cssText='font-size:11px;color:var(--ts);margin-bottom:10px';catEl.textContent=cats;card.appendChild(catEl);}
     const acoes=document.createElement('div');acoes.style.cssText='display:flex;gap:6px;flex-wrap:wrap';
-    const bHist=btn('btn bg bsm','📦 Histórico',()=>histFornecedor(forn));
-    const bEdit=btn('btn bg bsm','✏️ Editar',()=>modalFornecedor(forn,()=>{
+    const bHist=el('button','btn bg bsm',null,{html:'<i class="ph-duotone ph-package"></i> Histórico',onclick:()=>histFornecedor(forn)});
+    const bEdit=el('button','btn bg bsm',null,{html:'<i class="ph-duotone ph-pencil-simple"></i> Editar',onclick:()=>modalFornecedor(forn,()=>{
       db('lola_fornecedores','GET',null,'?ativo=eq.true&order=nome.asc').then(d=>{_fornecedores=d;drawForn(w,busca);});
-    }));
-    const bDel=btn('btn bd bsm','🗑 Excluir',async()=>{
+    })});
+    const bDel=el('button','btn bd bsm',null,{html:'<i class="ph-duotone ph-trash"></i> Excluir',onclick:async()=>{
       if(!confirm('Excluir "'+forn.nome+'"?'))return;
       await db('lola_fornecedores','PATCH',{ativo:false},'?id=eq.'+forn.id);
       _fornecedores=await db('lola_fornecedores','GET',null,'?ativo=eq.true&order=nome.asc');
       drawForn(w,busca);
-    });
+    }});
     acoes.appendChild(bHist);acoes.appendChild(bEdit);acoes.appendChild(bDel);
     if(wp){
       const bWp=document.createElement('a');bWp.href='https://wa.me/'+wp;bWp.target='_blank';
@@ -5306,7 +5306,7 @@ function _confFillList(list){
   list.innerHTML=rows.map(function(r){
     var gi=_CONF.rows.indexOf(r);
     var bl=(r.status==='up')?'border-left:4px solid #B5302E;':(r.status==='down')?'border-left:4px solid #2C7A4B;':(r.status==='unit'||r.status==='none')?'border-left:4px solid #9A6B1E;':'';
-    var warn=(r.status==='unit')?'<div style="margin-top:8px;font-size:.72rem;color:#9A6B1E;background:#FBF0DD;border-radius:9px;padding:6px 9px">⚠️ Unidade na planilha: <b>'+_cesc(r.sheetUn||'?')+'</b> ≠ atual: <b>'+_cesc(r.atualUn||'?')+'</b> — confira preço e unidade. R$ '+R(r.sheetPrice).replace('R$','').trim()+' veio na planilha.</div>':'';
+    var warn=(r.status==='unit')?'<div style="margin-top:8px;font-size:.72rem;color:#9A6B1E;background:#FBF0DD;border-radius:9px;padding:6px 9px"><i class="ph-duotone ph-warning"></i> Unidade na planilha: <b>'+_cesc(r.sheetUn||'?')+'</b> ≠ atual: <b>'+_cesc(r.atualUn||'?')+'</b> — confira preço e unidade. R$ '+R(r.sheetPrice).replace('R$','').trim()+' veio na planilha.</div>':'';
     return '<div style="background:#fff;border:1px solid var(--rb);'+bl+'border-radius:16px;padding:13px 14px;margin-bottom:11px">'+
       '<div style="display:flex;align-items:flex-start;gap:10px">'+
         '<label style="flex:0 0 auto;cursor:pointer;margin-top:1px"><input type="checkbox" class="cf-ap" data-gi="'+gi+'" '+(r.apply?'checked':'')+' style="width:20px;height:20px;accent-color:var(--v)"></label>'+
@@ -5337,7 +5337,7 @@ function _confRender(c){
   var list=document.createElement('div');list.id='confList';c.appendChild(list);
   _confFillList(list);
   var ab=document.createElement('div');ab.style.cssText='position:sticky;bottom:0;margin-top:6px;padding:10px 0 4px';
-  var apBtn=btn('btn bp','✅ Aplicar selecionados',function(){_confApply(c);});apBtn.style.cssText='width:100%;padding:13px;font-weight:800';
+  var apBtn=el('button','btn bp',null,{html:'<i class="ph-duotone ph-check"></i> Aplicar selecionados',onclick:function(){_confApply(c);}});apBtn.style.cssText='width:100%;padding:13px;font-weight:800';
   ab.appendChild(apBtn);c.appendChild(ab);
 }
 async function _confApply(c){
@@ -5367,9 +5367,9 @@ function pgConferencia(c){
   c.innerHTML='';
   if(!_CONF){try{var s=localStorage.getItem('lola_conf_precos');if(s)_CONF=JSON.parse(s);}catch(e){}}
   var bar=div('no-print');bar.style.cssText='display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin:6px 0 14px';
-  bar.appendChild(btn('btn bp',(_CONF?'⬆️ Subir outra planilha':'⬆️ Subir planilha de preços'),function(){_confUpload(c);}));
+  bar.appendChild(el('button','btn bp',null,{html:'<i class="ph-duotone ph-upload-simple"></i> '+(_CONF?'Subir outra planilha':'Subir planilha de preços'),onclick:function(){_confUpload(c);}}));
   if(_CONF){
-    bar.appendChild(btn('btn bo bsm','🗑️ Limpar',function(){if(!confirm('Limpar a conferência atual?'))return;_CONF=null;try{localStorage.removeItem('lola_conf_precos');}catch(e){}pgConferencia(c);}));
+    bar.appendChild(el('button','btn bo bsm',null,{html:'<i class="ph-duotone ph-trash"></i> Limpar',onclick:function(){if(!confirm('Limpar a conferência atual?'))return;_CONF=null;try{localStorage.removeItem('lola_conf_precos');}catch(e){}pgConferencia(c);}}));
     var inf=span('tss','Conferência de '+(_CONF.when?new Date(_CONF.when).toLocaleString('pt-BR'):''));bar.appendChild(inf);
   }
   c.appendChild(bar);
