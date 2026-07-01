@@ -64,6 +64,7 @@ body{font-family:'Hanken Grotesk',sans-serif;background:var(--rf);color:var(--tx
 .ins-btns{display:flex;gap:6px;margin-top:10px;justify-content:flex-end;}
 .ins-ab{flex:0 0 auto;width:46px;height:36px;background:#F7F1EA;border:1px solid var(--rb);border-radius:11px;color:var(--v);font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
 .ins-ab.del{background:#FBEAE7;border-color:#F3D3CE;color:#B5302E;}
+.ins-ab.warn{background:#FBF0DD;border-color:#F1DFB8;color:#9A6B1E;}
 @media(max-width:768px){
   .ins-btns{justify-content:stretch;}
   .ins-ab{flex:1 1 0;width:auto;height:38px;}
@@ -1637,7 +1638,7 @@ function drawFT(w){
     return x.custo_por_porcao/x.preco_venda*100>30;
   });
   if(alertas.length&&!_ftBusca){
-    const alertBox=div('al',null,{style:'background:#fee2e2;border:1.5px solid #fca5a5;color:#7f1d1d;border-radius:10px;padding:12px 16px;margin-bottom:14px'});
+    const alertBox=div('al',null,{style:'background:#FBEAE7;border:1px solid #F3D3CE;color:#B5302E;border-radius:14px;padding:12px 16px;margin-bottom:14px'});
     alertBox.appendChild(el('div','bold','Revisar ficha técnica - CMV acima de 30%:',{style:'margin-bottom:8px;font-size:13px'}));
     alertas.forEach(x=>{
       const cmv=(x.custo_por_porcao/x.preco_venda*100).toFixed(0);
@@ -1650,8 +1651,8 @@ function drawFT(w){
   }
   if(!f.length){w.appendChild(em('ficha',_ftBusca?'Nenhuma ficha encontrada':'Nenhuma ficha aqui'));return;}
 
-  const DEST_COR={ccmq:'#AA2B2B',mac:'#166534',eventos:'#c47700'};
-  const DEST_LBL={ccmq:'CCMQ',mac:'MAC',eventos:'Evento'};
+  const DEST_COR={ccmq:'#C0392B',mac:'#2C7A4B',central:'#2C5AA0',eventos:'#9A6B1E'};
+  const DEST_LBL={ccmq:'CCMQ',mac:'MAC',central:'Central',eventos:'Evento'};
 
   f.forEach(x=>{
     const semPreco=!x.preco_venda||x.preco_venda<=0;
@@ -1659,7 +1660,7 @@ function drawFT(w){
     const dataEd=x.editado_em?new Date(x.editado_em).toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}):null;
 
     const card=document.createElement('div');
-    card.style.cssText='background:#fff;border:1.5px solid var(--rb);border-radius:14px;padding:12px 14px;margin-bottom:10px'+((!semPreco&&cmv>30)?';border-color:#fca5a5;background:#fff5f5':'');
+    card.style.cssText='background:#fff;border:1px solid var(--rb);border-radius:16px;padding:13px 14px;margin-bottom:10px;box-shadow:0 1px 2px rgba(42,26,23,.05)'+((!semPreco&&cmv>30)?';border-color:#F3D3CE;background:#FFF7F6':'');
 
     // Linha 1: nome + badge revisar
     const l1=document.createElement('div');l1.style.cssText='display:flex;align-items:flex-start;gap:8px;margin-bottom:6px';
@@ -1667,8 +1668,8 @@ function drawFT(w){
     const nomeStrong=document.createElement('strong');nomeStrong.style.cssText='font-size:14px;display:block';nomeStrong.textContent=x.nome;
     nomeWrap.appendChild(nomeStrong);
     if(x.revisar){
-      const rv=document.createElement('span');rv.style.cssText='display:inline-block;margin-top:3px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:50px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;cursor:pointer';
-      rv.textContent='\u26a0\uFE0F revisar';rv.title=x.revisar_motivo||'';
+      const rv=document.createElement('span');rv.style.cssText='display:inline-flex;align-items:center;gap:3px;margin-top:3px;font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;background:#FBF0DD;color:#9A6B1E;border:1px solid #F1DFB8;cursor:pointer';
+      rv.innerHTML='<i class="ph-duotone ph-warning"></i> revisar';rv.title=x.revisar_motivo||'';
       rv.addEventListener('click',e=>{e.stopPropagation();modalRevisarFicha('ft',x);});
       nomeWrap.appendChild(rv);
     }
@@ -1706,20 +1707,18 @@ function drawFT(w){
     if(dataEd) l2.appendChild(mkInfo('Editado',( x.editado_por||'—')+' · '+dataEd));
     card.appendChild(l2);
 
-    // Linha 3: botões
-    const btns=document.createElement('div');btns.style.cssText='display:flex;gap:6px;flex-wrap:wrap;align-items:center';
-    const bMk=btn('btn bg bsm',x.revisar?'\u26a0\uFE0F Revisar':'\u26a0\uFE0F',()=>modalRevisarFicha('ft',x));
-    if(x.revisar){bMk.style.cssText='padding:3px 8px;border-radius:50px;background:#fef3c7;color:#92400e;font-size:11px;font-weight:700;border:1.5px solid #fcd34d;white-space:nowrap;cursor:pointer';}
-    bMk.title=x.revisar?x.revisar_motivo||'':'Marcar para revisar';
+    // Linha 3: botões (Phosphor, v2 — pequenos à direita no desktop, iguais no celular)
+    const btns=div('ins-btns');
+    const bMk=el('button','ins-ab'+(x.revisar?' warn':''),null,{html:'<i class="ph-duotone ph-warning"></i>',title:x.revisar?(x.revisar_motivo||'Revisar'):'Marcar para revisar',onclick:()=>modalRevisarFicha('ft',x)});
     btns.appendChild(bMk);
-    btns.appendChild(btn('btn bg bsm','\u{1F4CB}',()=>verFichaFT(x)));
-    btns.appendChild(btn('btn bg bsm','\u270F\uFE0F',()=>modalFicha(x)));
-    const del=btn('btn bd bsm','\u{1F5D1}',async()=>{
+    btns.appendChild(el('button','ins-ab',null,{html:'<i class="ph-duotone ph-eye"></i>',title:'Ver',onclick:()=>verFichaFT(x)}));
+    btns.appendChild(el('button','ins-ab',null,{html:'<i class="ph-duotone ph-pencil-simple"></i>',title:'Editar',onclick:()=>modalFicha(x)}));
+    const del=el('button','ins-ab del',null,{html:'<i class="ph-duotone ph-trash"></i>',title:'Excluir',onclick:async()=>{
       if(!confirm('Excluir '+x.nome+'?'))return;
       await db('lola_fichas_tecnicas','PATCH',{ativo:false},'?id=eq.'+x.id);
       _ft=await db('lola_fichas_tecnicas','GET',null,'?select=*&ativo=eq.true&order=nome.asc');
       drawFT($('#ft-t'));
-    });
+    }});
     btns.appendChild(del);
     card.appendChild(btns);
     if(x.capa){
@@ -1744,8 +1743,8 @@ async function pgFichas(c){
     const ftSearchEl=mkSearch(q=>{_ftBusca=q;drawFT($('#ft-t'));},'Buscar ficha técnica...');
     const _ftKeys=['todos','ccmq','beb_ccmq','mac','beb_mac','eventos','beb_eventos'];
     const _ftLbls=['Tudo','Pratos CCMQ','Bebidas CCMQ','Pratos MAC','Bebidas MAC','Pratos Eventos','Bebidas Eventos'];
-    const _ftCor={ccmq:'#AA2B2B',beb_ccmq:'#AA2B2B',mac:'#166534',beb_mac:'#166534',eventos:'#caa300',beb_eventos:'#caa300'};
-    const _ftDark={eventos:1,beb_eventos:1};
+    const _ftCor={ccmq:'#C0392B',beb_ccmq:'#C0392B',mac:'#2C7A4B',beb_mac:'#2C7A4B',eventos:'#9A6B1E',beb_eventos:'#9A6B1E'};
+    const _ftDark={};
     let ftTabsEl;
     function _paintBebTabs(){if(!ftTabsEl)return;ftTabsEl.querySelectorAll('.tp').forEach((tp,i)=>{const k=_ftKeys[i];const cor=_ftCor[k];if(!cor)return;if(tp.classList.contains('active')){tp.style.background=cor;tp.style.color=_ftDark[k]?'#3a2e00':'#fff';tp.style.borderColor=cor;}else{tp.style.background='#fff';tp.style.color=cor;tp.style.borderColor=cor;}});}
     ftTabsEl=mkTabs(_ftKeys,_ftTab,t=>{_ftTab=t;drawFT($('#ft-t'));_paintBebTabs();},_ftLbls,true);
@@ -1754,7 +1753,7 @@ async function pgFichas(c){
     ftBarEsq.appendChild(ftTabsEl);ftBarEsq.appendChild(ftSearchEl);
     const ftBar=div('abar no-print');
     ftBar.appendChild(ftBarEsq);
-    ftBar.appendChild(btn('btn bp bsm','+ Nova ficha',()=>modalFicha()));
+    ftBar.appendChild(el('button','btn bp bsm',null,{html:'<i class="ph-duotone ph-plus"></i> Nova ficha',onclick:()=>modalFicha()}));
     c.appendChild(ftBar);
     const w=div(null,null,{id:'ft-t'});c.appendChild(w);
     drawFT(w);
@@ -1767,13 +1766,13 @@ function mkCMV(preco_venda, custo){
   const cmvStr=cmv.toFixed(0)+'%';
   if(cmv>30){
     return div('fl_ aic gap2',[
-      span(null,'🔴'),
-      el('span','bold',cmvStr,{style:'color:#dc2626'}),
-      span('tss','revisar ficha',{style:'font-size:10px;background:#fee2e2;color:#dc2626;padding:1px 6px;border-radius:50px'})
+      el('span',null,null,{style:'width:9px;height:9px;border-radius:50%;display:inline-block;flex-shrink:0;background:#B5302E'}),
+      el('span','bold',cmvStr,{style:'color:#B5302E'}),
+      span('tss','revisar ficha',{style:'font-size:10px;background:#FBEAE7;color:#B5302E;padding:1px 8px;border-radius:99px'})
     ]);
   }
   return div('fl_ aic gap2',[
-    span(null,'🟢'),
+    el('span',null,null,{style:'width:9px;height:9px;border-radius:50%;display:inline-block;flex-shrink:0;background:#2C7A4B'}),
     el('span','bold',cmvStr,{style:'color:var(--vd)'}),
   ]);
 }
