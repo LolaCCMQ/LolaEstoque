@@ -61,9 +61,13 @@ body{font-family:'Hanken Grotesk',sans-serif;background:var(--rf);color:var(--tx
 .ins-upd b{color:var(--ts);font-weight:700;}
 .ins-upd i{font-size:14px;flex-shrink:0;}
 .ins-upd-none{color:#B79A8E;}
-.ins-btns{display:flex;gap:6px;margin-top:10px;}
-.ins-ab{flex:1;height:38px;background:#F7F1EA;border:1px solid var(--rb);border-radius:11px;color:var(--v);font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.ins-btns{display:flex;gap:6px;margin-top:10px;justify-content:flex-end;}
+.ins-ab{flex:0 0 auto;width:46px;height:36px;background:#F7F1EA;border:1px solid var(--rb);border-radius:11px;color:var(--v);font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
 .ins-ab.del{background:#FBEAE7;border-color:#F3D3CE;color:#B5302E;}
+@media(max-width:768px){
+  .ins-btns{justify-content:stretch;}
+  .ins-ab{flex:1 1 0;width:auto;height:38px;}
+}
 /* PEDIDO CARD (v2) */
 .ped-card{background:#fff;border:1px solid var(--rb);border-radius:16px;padding:13px 14px;margin-bottom:10px;box-shadow:0 1px 2px rgba(42,26,23,.05);}
 .ped-top{display:flex;align-items:center;justify-content:space-between;gap:10px;}
