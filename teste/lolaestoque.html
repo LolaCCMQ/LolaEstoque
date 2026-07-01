@@ -65,6 +65,16 @@ body{font-family:'Hanken Grotesk',sans-serif;background:var(--rf);color:var(--tx
 .ins-ab{flex:0 0 auto;width:46px;height:36px;background:#F7F1EA;border:1px solid var(--rb);border-radius:11px;color:var(--v);font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
 .ins-ab.del{background:#FBEAE7;border-color:#F3D3CE;color:#B5302E;}
 .ins-ab.warn{background:#FBF0DD;border-color:#F1DFB8;color:#9A6B1E;}
+/* CONTAGEM item card (v2) */
+.cont-card{background:#fff;border:1px solid var(--rb);border-radius:16px;padding:12px 14px;margin-bottom:9px;box-shadow:0 1px 2px rgba(42,26,23,.05);}
+.cont-top{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.cont-nome{font-size:14px;font-weight:700;color:var(--tx);}
+.cont-st{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;white-space:nowrap;}
+.cont-dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex-shrink:0;}
+.cont-meta{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-top:8px;}
+.cont-cl{font-size:9px;color:#8A7A72;text-transform:uppercase;letter-spacing:.5px;}
+.cont-cv{font-size:13px;font-weight:700;color:var(--tx);}
+.cont-edit{margin-left:auto;width:40px;height:34px;background:#F7F1EA;border:1px solid var(--rb);border-radius:10px;color:var(--v);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 @media(max-width:768px){
   .ins-btns{justify-content:stretch;}
   .ins-ab{flex:1 1 0;width:auto;height:38px;}
@@ -3254,9 +3264,9 @@ async function pgCont2(c){
       dropPanel.appendChild(item);
     });
     dropWrap.appendChild(dropBtn);dropWrap.appendChild(dropPanel);barCont.appendChild(dropWrap);
-    const btnGer=btn('btn bo bsm','⚙️ Gerenciar',()=>modalGerenciarItens(_contCat,()=>renderContArea()));
+    const btnGer=el('button','btn bo bsm',null,{html:'<i class="ph-duotone ph-gear"></i> Gerenciar',onclick:()=>modalGerenciarItens(_contCat,()=>renderContArea())});
     btnGer.style.cssText='padding:9px 16px;font-size:13px;font-weight:700;border-radius:50px;white-space:nowrap';
-    const btnNC=btn('btn bp bsm','+ Nova contagem',()=>modalNovaContagem(c));
+    const btnNC=el('button','btn bp bsm',null,{html:'<i class="ph-duotone ph-plus"></i> Nova contagem',onclick:()=>modalNovaContagem(c)});
     btnNC.style.cssText='padding:9px 16px;font-size:13px;font-weight:800;border-radius:50px;white-space:nowrap;box-shadow:0 3px 10px rgba(170,43,43,.25)';
     barCont.appendChild(btnGer);barCont.appendChild(btnNC);
     c.appendChild(barCont);
@@ -3282,8 +3292,8 @@ async function renderContArea(){
         const dataFmt=new Date(ct.data_contagem+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'short'});
         const card=div('sc');card.style.cursor='pointer';card.style.position='relative';
         const bDel=document.createElement('button');bDel.type='button';
-        bDel.style.cssText='position:absolute;top:8px;right:8px;padding:3px 8px;border-radius:8px;border:1px solid #fca5a5;background:#fee2e2;color:#dc2626;font-size:11px;font-weight:700;cursor:pointer;z-index:2';
-        bDel.textContent='🗑';
+        bDel.style.cssText='position:absolute;top:8px;right:8px;padding:4px 8px;border-radius:9px;border:1px solid #F3D3CE;background:#FBEAE7;color:#B5302E;font-size:13px;font-weight:700;cursor:pointer;z-index:2';
+        bDel.innerHTML='<i class="ph-duotone ph-trash"></i>';
         bDel.addEventListener('click',async e=>{
           e.stopPropagation();
           const resp=ct.responsavel||'';
@@ -3333,52 +3343,45 @@ async function renderContArea(){
     const abaixo=itens.filter(it=>{const u=ultimosItens[it.id];return u&&parseFloat(u.qtd)<=parseFloat(it.qtd_minima);});
     if(abaixo.length){
       const alertBox=document.createElement('div');
-      alertBox.style.cssText='background:#fee2e2;border:1.5px solid #fca5a5;color:#7f1d1d;border-radius:10px;padding:12px 16px;margin-bottom:14px';
-      const t=document.createElement('div');t.style.cssText='font-weight:700;font-size:13px;margin-bottom:8px';t.textContent='⚠️ Abaixo do mínimo na última contagem:';alertBox.appendChild(t);
+      alertBox.style.cssText='background:#FBEAE7;border:1px solid #F3D3CE;color:#B5302E;border-radius:14px;padding:12px 16px;margin-bottom:14px';
+      const t=document.createElement('div');t.style.cssText='font-weight:700;font-size:13px;margin-bottom:8px;display:flex;align-items:center;gap:6px';t.innerHTML='<i class="ph-duotone ph-warning"></i> Abaixo do mínimo na última contagem:';alertBox.appendChild(t);
       abaixo.forEach(it=>{
         const u=ultimosItens[it.id];
-        const r=document.createElement('div');r.style.cssText='display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #fca5a580;font-size:12px';
-        r.innerHTML='<span>🔴 '+it.nome+'</span><span>'+N(u?.qtd||0,1)+' '+it.unidade+' (mín: '+N(it.qtd_minima,0)+')</span>';
+        const r=document.createElement('div');r.style.cssText='display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #F3D3CE;font-size:12px';
+        r.innerHTML='<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#B5302E;margin-right:6px"></span>'+it.nome+'</span><span>'+N(u?.qtd||0,1)+' '+it.unidade+' (mín: '+N(it.qtd_minima,0)+')</span>';
         alertBox.appendChild(r);
       });
       area.appendChild(alertBox);
     }
 
-    // Tabela
-    area.appendChild(div('tw',mkTable(
-      ['Produto','Un. compra','Un. uso','Mín.','Última qtd','Status','Fornecedor'],
-      itens.map(it=>{
-        const u=ultimosItens[it.id];
-        const qtd=u?parseFloat(u.qtd):null;
-        const min=parseFloat(it.qtd_minima)||0;
-        let statusEl;
-        if(qtd===null){statusEl=span('tss','não contado');}
-        else if(qtd<=0){const d=div('fl_ aic gap2');d.appendChild(span(null,'🔴'));const s=document.createElement('span');s.style.cssText='font-size:12px;font-weight:700;color:#dc2626';s.textContent='Zerado';d.appendChild(s);statusEl=d;}
-        else if(qtd<=min){const d=div('fl_ aic gap2');d.appendChild(span(null,'🟠'));const s=document.createElement('span');s.style.cssText='font-size:12px;font-weight:700;color:#c4852a';s.textContent='Abaixo';d.appendChild(s);statusEl=d;}
-        else if(qtd<=min*1.5){const d=div('fl_ aic gap2');d.appendChild(span(null,'🟡'));const s=document.createElement('span');s.textContent='Atenção';d.appendChild(s);statusEl=d;}
-        else{const d=div('fl_ aic gap2');d.appendChild(span(null,'🟢'));const s=document.createElement('span');s.style.color='var(--vd)';s.textContent='OK';d.appendChild(s);statusEl=d;}
-        const btnEdit=btn('btn bg bsm','✏️',()=>modalEditarItemEstoque(it,()=>renderContArea()));
-        // Coluna última qtd com data
-        let ultimaQtdEl;
-        if(qtd===null){
-          ultimaQtdEl=span('tss','—');
-        } else {
-          ultimaQtdEl=div(null);
-          const qtdSpan=document.createElement('span');
-          qtdSpan.style.cssText='font-weight:700';
-          qtdSpan.textContent=N(qtd,1)+' '+it.unidade;
-          ultimaQtdEl.appendChild(qtdSpan);
-          if(u.data){
-            const dataSpan=document.createElement('div');
-            dataSpan.style.cssText='font-size:10px;color:var(--ts)';
-            dataSpan.textContent=u.data;
-            ultimaQtdEl.appendChild(dataSpan);
-          }
-        }
-        return[el('strong',null,it.nome),el('span','tss',it.unidade_compra||it.unidade),it.unidade,N(min,0),ultimaQtdEl,statusEl,el('span','tss',it.fornecedor||'—'),btnEdit];
-      }),
-      [null,'tr','tr','tr','tr',null,null,null]
-    )));
+    // Cartões de item (1 item = 1 card, sem rolagem lateral)
+    const contCell=(l,v)=>div('cont-cell',[el('div','cont-cl',[l]),el('div','cont-cv',[String(v)])]);
+    const wrapIt=document.createElement('div');
+    itens.forEach(it=>{
+      const u=ultimosItens[it.id];
+      const qtd=u?parseFloat(u.qtd):null;
+      const min=parseFloat(it.qtd_minima)||0;
+      let stDot,stLab,stCol;
+      if(qtd===null){stDot='#B79A8E';stLab='Não contado';stCol='#8A7A72';}
+      else if(qtd<=0){stDot='#B5302E';stLab='Zerado';stCol='#B5302E';}
+      else if(qtd<=min){stDot='#E8A32B';stLab='Abaixo';stCol='#9A6B1E';}
+      else if(qtd<=min*1.5){stDot='#C9A227';stLab='Atenção';stCol='#9A6B1E';}
+      else{stDot='#2C7A4B';stLab='OK';stCol='#2C7A4B';}
+      const card=div('cont-card');
+      const top=div('cont-top');
+      top.appendChild(el('span','cont-nome',[it.nome]));
+      top.appendChild(el('span','cont-st',null,{html:'<span class="cont-dot" style="background:'+stDot+'"></span> '+stLab,style:'color:'+stCol}));
+      card.appendChild(top);
+      const meta=div('cont-meta');
+      const uq = qtd===null ? '—' : (N(qtd,1)+' '+it.unidade + (u&&u.data?(' · '+u.data):''));
+      meta.appendChild(contCell('Última qtd',uq));
+      meta.appendChild(contCell('Mínimo',N(min,0)));
+      meta.appendChild(contCell('Fornecedor',it.fornecedor||'—'));
+      meta.appendChild(el('button','cont-edit',null,{html:'<i class="ph-duotone ph-pencil-simple"></i>',title:'Editar',onclick:()=>modalEditarItemEstoque(it,()=>renderContArea())}));
+      card.appendChild(meta);
+      wrapIt.appendChild(card);
+    });
+    area.appendChild(wrapIt);
   }catch(e){area.innerHTML='<p style="color:red">'+e.message+'</p>';}
 }
 
