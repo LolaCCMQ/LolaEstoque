@@ -1893,7 +1893,7 @@ async function modalFicha(item){
   const _tabBeb=(_ftTab||'').indexOf('beb_')===0;
   const _tabCard=_tabBeb?_ftTab.slice(4):(['ccmq','mac','eventos','central'].includes(_ftTab)?_ftTab:'ccmq');
   const _defCat=item?.categoria||(_tabBeb?'bebida':'prato');
-  let f={nome:item?.nome||'',cardapio:item?.cardapio||_tabCard,categoria:_defCat,rendimento_qtd:item?.rendimento_qtd||1,rendimento_un:item?.rendimento_un||'porção',preco_venda:item?.preco_venda||'',meta_cmv:item?.meta_cmv||30,modo_preparo:item?.modo_preparo||'',observacoes:item?.observacoes||''};
+  let f={nome:item?.nome||'',cardapio:item?.cardapio||_tabCard,categoria:_defCat,rendimento_qtd:item?.rendimento_qtd||1,rendimento_un:item?.rendimento_un||'porção',preco_venda:item?.preco_venda||'',meta_cmv:item?.meta_cmv||30,modo_preparo:item?.modo_preparo||'',observacoes:item?.observacoes||'',e_preparo:!!item?.e_preparo};
   // Custo fixo do banco — não zera ao editar preço de venda
   let custoTotalFixo=parseFloat(item?.custo_total||0);
   let custoPorcaoFixo=parseFloat(item?.custo_por_porcao||0);
@@ -2063,6 +2063,19 @@ async function modalFicha(item){
   const descEd=el('input','fi',null,{type:'text',id:'ft-descricao-edicao',placeholder:ed?'Ex: ajustei gramatura do croissant de 80g para 110g':'Nova ficha'});
   // Seletor de destinos
   const destSelectorFT=mkDestinosSelector(item?.destinos||[],'ft');
+  // Toggle pré-preparo (entra no Pedido à Central)
+  const prePreparoToggle=(()=>{
+    const wrap=div('fl_ aic');
+    wrap.style.cssText='margin-top:4px;padding:12px 14px;background:#fff;border:1.5px solid var(--rb);border-radius:13px;gap:12px;cursor:pointer;user-select:none';
+    const txt=div(null);txt.style.cssText='flex:1';
+    txt.innerHTML='<div style="font-size:14px;font-weight:800;color:var(--tx)">Pré-preparo</div><div style="font-size:11px;color:#8A7A72">Entra no Pedido à Central em todas as unidades</div>';
+    const sw=document.createElement('div');const knob=document.createElement('div');sw.appendChild(knob);
+    function paint(){sw.style.cssText='width:46px;height:26px;border-radius:50px;position:relative;flex-shrink:0;transition:background .15s;background:'+(f.e_preparo?'var(--v)':'#D9CEC4');knob.style.cssText='width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:3px;transition:left .15s;left:'+(f.e_preparo?'23px':'3px');}
+    paint();
+    wrap.addEventListener('click',()=>{f.e_preparo=!f.e_preparo;paint();});
+    wrap.appendChild(txt);wrap.appendChild(sw);
+    return wrap;
+  })();
 
   let fotos=[]; if(ed && item?.id){ try{ const _fr=await db('lola_fichas_fotos','GET',null,'?ficha_id=eq.'+item.id+'&order=created_at.asc'); fotos=(_fr||[]).map(function(x){return x.foto;}); }catch(e){} }
   const fotosWidget=buildFotosWidget(fotos);
@@ -2087,6 +2100,7 @@ async function modalFicha(item){
     fgrp('Rendimento (qtd)',finp('',f.rendimento_qtd,v=>f.rendimento_qtd=v,'number')),
       fgrp('Unidade rendimento',fsel('',['porção','un','kg','L','pessoa'],f.rendimento_un,v=>f.rendimento_un=v)),
     ]),
+    prePreparoToggle,
     fgrp('📷 Fotos do prato',fotosWidget),
     el('hr','dv'),
     div('fl_ jb aic mb3',[
@@ -2122,7 +2136,7 @@ async function modalFicha(item){
     const ct2=ings.length>0?ings.reduce((t,ig)=>t+parseFloat(ig.custo_total||0),0):custoTotalFixo;
     const cpp2=ings.length>0?ct2/parseFloat(f.rendimento_qtd||1):custoPorcaoFixo;
     const descricaoEd=document.getElementById('ft-descricao-edicao')?.value||'';
-    const p={nome:f.nome,cardapio:f.cardapio,categoria:f.categoria,destinos:destSelectorFT.getDestinos(),rendimento_qtd:parseFloat(f.rendimento_qtd),rendimento_un:f.rendimento_un,preco_venda:parseFloat(f.preco_venda)||null,custo_total:ct2,custo_por_porcao:cpp2,modo_preparo:f.modo_preparo||null,observacoes:f.observacoes||null,editado_por:_autorFt.v||null,editado_em:new Date().toISOString()};
+    const p={nome:f.nome,cardapio:f.cardapio,categoria:f.categoria,destinos:destSelectorFT.getDestinos(),e_preparo:!!f.e_preparo,rendimento_qtd:parseFloat(f.rendimento_qtd),rendimento_un:f.rendimento_un,preco_venda:parseFloat(f.preco_venda)||null,custo_total:ct2,custo_por_porcao:cpp2,modo_preparo:f.modo_preparo||null,observacoes:f.observacoes||null,editado_por:_autorFt.v||null,editado_em:new Date().toISOString()};
     let _capa=''; if(typeof fotos!=='undefined' && fotos && fotos.length){ try{ _capa=await _thumbP(fotos[0],320); }catch(e){} } p.capa=_capa;
     let fid;
     if(ed){
@@ -4179,6 +4193,7 @@ async function modalNovoPedido(){
   // Sempre recarregar para ter destinos atualizados
   _pp=await db('lola_preproducoes','GET',null,'?select=id,nome,categoria,rendimento_qtd,rendimento_un,porcao_qtd,porcao_un,custo_total,custo_por_unidade,valor_venda_central,margem_venda,destinos,e_preparo&ativo=eq.true&order=nome.asc');
   _ins=await db('lola_insumos','GET',null,'?select=id,nome,categoria,unidade_compra,unidade_custo,custo_por_unidade,destinos&ativo=eq.true&order=nome.asc');
+  const ftPre=await db('lola_fichas_tecnicas','GET',null,'?select=id,nome,custo_por_porcao,rendimento_un,e_preparo&ativo=eq.true&e_preparo=eq.true&order=nome.asc');
 
   const DEST_COR={ccmq:'#AA2B2B',mac:'#166534',eventos:'#c47700'};
   const DEST_LBL={ccmq:'CCMQ',mac:'MAC',eventos:'Evento'};
@@ -4248,12 +4263,13 @@ async function modalNovoPedido(){
     // Pedido à central: pré-preparos + marcados destino "central"; insumos da unidade + destino "central"
     const ppDest=_pp.filter(x=>(x.e_preparo||(x.destinos||[]).includes('central'))&&
       (!_buscaNovoPed||x.nome.toLowerCase().includes(_buscaNovoPed)));
+    const ftDest=ftPre.filter(x=>(!_buscaNovoPed||x.nome.toLowerCase().includes(_buscaNovoPed)));
     const insDest=_ins.filter(x=>((x.destinos||[]).includes(_destPed)||(x.destinos||[]).includes('central'))&&
       (!_buscaNovoPed||x.nome.toLowerCase().includes(_buscaNovoPed)));
 
     const conteudo=div(null);
 
-    if(!ppDest.length&&!insDest.length){
+    if(!ppDest.length&&!insDest.length&&!ftDest.length){
       conteudo.appendChild(div('tss mt3 mb3','Nenhum item categorizado para '+DEST_LBL[_destPed]+' ainda. Use o botão 🏷️ nas pré-produções e insumos para categorizar.'));
       itensArea.appendChild(conteudo);
       return;
@@ -4306,6 +4322,14 @@ async function modalNovoPedido(){
       });
       conteudo.appendChild(g);
     }
+
+    // Grupo fichas técnicas (pré-preparo) — preço = custo por porção
+    mkGrupo('🏷️ Fichas técnicas',ftDest,
+      x=>parseFloat(x.custo_por_porcao)||0,
+      x=>x.rendimento_un||'porção',
+      x=>'ft_'+x.id,
+      x=>x.nome
+    );
 
     // Grupo pré-produções
     mkGrupo('🍳 Pré-produções',ppDest,
