@@ -2632,6 +2632,15 @@ async function pgSaidas(c){
       }
     }catch(_e){}
 
+    // Botão largo "Nova saída" no corpo — modo embed/celular não tem .bhead-acts no cabeçalho (fix 02/07)
+    if(!document.getElementById('btnNovaSaida')){
+      var _bw=el('button',null,null,{html:'<i class="ph-duotone ph-plus" style="font-size:18px"></i> Nova saída',onclick:function(){modalNovaSaida(function(){pgSaidas(c);});}});
+      _bw.id='btnNovaSaidaBody';
+      _bw.className='no-print';
+      _bw.style.cssText='width:100%;min-height:44px;display:flex;align-items:center;justify-content:center;gap:8px;background:var(--v);color:#fff;border:0;border-radius:13px;font-family:Hanken Grotesk,sans-serif;font-weight:700;font-size:15px;padding:11px 16px;cursor:pointer;margin:0 0 12px';
+      c.appendChild(_bw);
+    }
+
     if(!itens.length){
       c.appendChild(em('📤','Nenhuma saída registrada ainda'));
       return;
