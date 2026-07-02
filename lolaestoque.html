@@ -4245,10 +4245,10 @@ async function modalNovoPedido(){
   function buildItens(){
     itensArea.innerHTML='';
 
-    // Filtrar pré-produções e insumos pelo destino selecionado
-    const ppDest=_pp.filter(x=>(x.destinos||[]).includes(_destPed)&&
+    // Pedido à central: pré-preparos + marcados destino "central"; insumos da unidade + destino "central"
+    const ppDest=_pp.filter(x=>(x.e_preparo||(x.destinos||[]).includes('central'))&&
       (!_buscaNovoPed||x.nome.toLowerCase().includes(_buscaNovoPed)));
-    const insDest=_ins.filter(x=>(x.destinos||[]).includes(_destPed)&&
+    const insDest=_ins.filter(x=>((x.destinos||[]).includes(_destPed)||(x.destinos||[]).includes('central'))&&
       (!_buscaNovoPed||x.nome.toLowerCase().includes(_buscaNovoPed)));
 
     const conteudo=div(null);
