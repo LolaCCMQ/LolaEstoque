@@ -65,9 +65,9 @@ body{font-family:'Hanken Grotesk',sans-serif;background:var(--rf);color:var(--tx
 .ins-ab{flex:0 0 auto;width:46px;height:36px;background:#F7F1EA;border:1px solid var(--rb);border-radius:11px;color:var(--v);font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
 .ins-ab.del{background:#FBEAE7;border-color:#F3D3CE;color:#B5302E;}
 .ins-ab.warn{background:#FBF0DD;border-color:#F1DFB8;color:#9A6B1E;}
-.ins-cat{display:inline-flex;align-items:center;gap:5px;font-weight:700;font-size:11.5px;padding:4px 10px;border-radius:11px;}.ins-cat i{font-size:14px;}
-.catc-hort{background:#E6F3EA;color:#2C7A4B;}.catc-carne{background:#FBEAE7;color:#B5302E;}.catc-vinho{background:#EFE6F6;color:#7A4FA3;}.catc-beb{background:#E6EEF8;color:#2C5AA0;}.catc-alc{background:#F6E3EE;color:#9B3B6E;}.catc-cerv{background:#FBF0DD;color:#9A6B1E;}.catc-alim{background:#F3ECDD;color:#8A6A2B;}.catc-limp{background:#E1F0EF;color:#2C7A6B;}.catc-paes{background:#F1E7DC;color:#8A5A2B;}.catc-def{background:#F5E9E6;color:#A82A2A;}
-.ins-sec{font-family:'Fraunces',serif;font-weight:600;font-size:17px;color:var(--v);margin:20px 2px 10px;display:flex;align-items:center;justify-content:space-between;}.ins-sec-ct{font-family:'Hanken Grotesk';font-size:11.5px;font-weight:700;color:var(--ts);background:#fff;border:1px solid var(--rb);border-radius:20px;padding:3px 11px;}
+.ins-cat{display:inline-flex;align-items:center;gap:5px;font-weight:700;font-size:11.5px;padding:4px 10px;border-radius:11px;text-transform:capitalize;}.ins-cat i{font-size:14px;}
+.catc-hort{background:#E6F3EA;color:#2C7A4B;}.catc-carne{background:#FBEAE7;color:#B5302E;}.catc-vinho{background:#EFE6F6;color:#7A4FA3;}.catc-beb{background:#E6EEF8;color:#2C5AA0;}.catc-cerv{background:#FBF0DD;color:#9A6B1E;}.catc-alim{background:#F3ECDD;color:#8A6A2B;}.catc-limp{background:#E1F0EF;color:#2C7A6B;}.catc-paes{background:#F1E7DC;color:#8A5A2B;}.catc-def{background:#F5E9E6;color:#A82A2A;}
+.ins-sec{font-family:'Fraunces',serif;font-weight:600;font-size:17px;color:var(--v);margin:20px 2px 10px;display:flex;align-items:center;justify-content:space-between;text-transform:capitalize;}.ins-sec-ct{font-family:'Hanken Grotesk';font-size:11.5px;font-weight:700;color:var(--ts);background:#fff;border:1px solid var(--rb);border-radius:20px;padding:3px 11px;text-transform:none;}
 .ins-custo-v{font-size:21px;}
 /* CONTAGEM item card (v2) */
 .cont-card{background:#fff;border:1px solid var(--rb);border-radius:16px;padding:12px 14px;margin-bottom:9px;box-shadow:0 1px 2px rgba(42,26,23,.05);}
@@ -661,7 +661,7 @@ async function pgIns(c){
       if(filtCat==='Todos'){
         const grupos={};f.forEach(i=>{if(!grupos[i.categoria])grupos[i.categoria]=[];grupos[i.categoria].push(i);});
         Object.entries(grupos).forEach(([cat,itens])=>{
-          w.appendChild(el('div','ins-sec',null,{html:'<span>'+cat+'</span><span class="ins-sec-ct">'+itens.length+' insumos</span>'}));
+          w.appendChild(el('div','ins-sec',null,{html:'<span>'+String(cat).replace(/_/g,' ')+'</span><span class="ins-sec-ct">'+itens.length+' insumos</span>'}));
           w.appendChild(mkInsTable(itens));
         });
       }else{
@@ -683,7 +683,7 @@ function mkInsTable(itens){
     const info=div('ins-info');
     info.appendChild(div('ins-nome',[i.nome]));
     const meta=div('ins-meta');
-    (function(){var M={'Hortifruti':['catc-hort','ph-carrot'],'Carnes e Pescados':['catc-carne','ph-cow'],'Vinhos':['catc-vinho','ph-wine'],'Bebidas Não Alcoólicas':['catc-beb','ph-drop'],'Bebidas Alcoólicas':['catc-alc','ph-martini'],'Cervejas':['catc-cerv','ph-beer-bottle'],'Insumos Alimentos':['catc-alim','ph-jar'],'Limpeza':['catc-limp','ph-spray-bottle'],'Pães':['catc-paes','ph-bread']};var m=M[i.categoria]||['catc-def','ph-tag'];meta.appendChild(el('span','ins-cat '+m[0],null,{html:'<i class="ph-duotone '+m[1]+'"></i> '+i.categoria}));})();
+    (function(){var c=(i.categoria||'').toLowerCase();var cls='catc-def',ic='ph-tag';if(c.indexOf('hortifr')>=0){cls='catc-hort';ic='ph-carrot';}else if(c.indexOf('carne')>=0||c.indexOf('pescad')>=0||c.indexOf('resfriad')>=0){cls='catc-carne';ic='ph-cow';}else if(c.indexOf('vinho')>=0){cls='catc-vinho';ic='ph-wine';}else if(c.indexOf('cerveja')>=0||c.indexOf('chopp')>=0){cls='catc-cerv';ic='ph-beer-bottle';}else if(c.indexOf('bebida')>=0){cls='catc-beb';ic='ph-drop';}else if(c.indexOf('limpeza')>=0){cls='catc-limp';ic='ph-spray-bottle';}else if(c.indexOf('pae')>=0||c.indexOf('pães')>=0||c.indexOf('pão')>=0){cls='catc-paes';ic='ph-bread';}else if(c.indexOf('aliment')>=0||c.indexOf('seco')>=0||c.indexOf('tempero')>=0){cls='catc-alim';ic='ph-jar';}var lb=String(i.categoria||'').replace(/_/g,' ');meta.appendChild(el('span','ins-cat '+cls,null,{html:'<i class="ph-duotone '+ic+'"></i> '+lb}));})();
     meta.appendChild(span('ins-un','por '+unCusto));
     info.appendChild(meta);
     top.appendChild(info);
