@@ -65,6 +65,10 @@ body{font-family:'Hanken Grotesk',sans-serif;background:var(--rf);color:var(--tx
 .ins-ab{flex:0 0 auto;width:46px;height:36px;background:#F7F1EA;border:1px solid var(--rb);border-radius:11px;color:var(--v);font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
 .ins-ab.del{background:#FBEAE7;border-color:#F3D3CE;color:#B5302E;}
 .ins-ab.warn{background:#FBF0DD;border-color:#F1DFB8;color:#9A6B1E;}
+.ins-cat{display:inline-flex;align-items:center;gap:5px;font-weight:700;font-size:11.5px;padding:4px 10px;border-radius:11px;text-transform:capitalize;}.ins-cat i{font-size:14px;}
+.catc-hort{background:#E6F3EA;color:#2C7A4B;}.catc-carne{background:#FBEAE7;color:#B5302E;}.catc-vinho{background:#EFE6F6;color:#7A4FA3;}.catc-beb{background:#E6EEF8;color:#2C5AA0;}.catc-cerv{background:#FBF0DD;color:#9A6B1E;}.catc-alim{background:#F3ECDD;color:#8A6A2B;}.catc-limp{background:#E1F0EF;color:#2C7A6B;}.catc-paes{background:#F1E7DC;color:#8A5A2B;}.catc-desc{background:#ECEFF1;color:#546E7A;}.catc-def{background:#F5E9E6;color:#A82A2A;}
+.ins-sec{font-family:'Fraunces',serif;font-weight:600;font-size:17px;color:var(--v);margin:20px 2px 10px;display:flex;align-items:center;justify-content:space-between;text-transform:capitalize;}.ins-sec-ct{font-family:'Hanken Grotesk';font-size:11.5px;font-weight:700;color:var(--ts);background:#fff;border:1px solid var(--rb);border-radius:20px;padding:3px 11px;text-transform:none;}
+.ins-custo-v{font-size:21px;}
 /* CONTAGEM item card (v2) */
 .cont-card{background:#fff;border:1px solid var(--rb);border-radius:16px;padding:12px 14px;margin-bottom:9px;box-shadow:0 1px 2px rgba(42,26,23,.05);}
 .cont-top{display:flex;align-items:center;justify-content:space-between;gap:8px;}
@@ -622,14 +626,14 @@ async function pgIns(c){
     _ins=await db('lola_insumos','GET',null,'?select=*&ativo=eq.true&order=categoria.asc,nome.asc');
     c.innerHTML='';
     // filtros de categoria
-    const CATS_ORDER=['Bebidas Alcoólicas','Bebidas Não Alcoólicas','Cervejas','Vinhos','Carnes e Pescados','Hortifruti','Insumos Alimentos','Limpeza','Pães'];
+    const CATS_ORDER=['Bebidas Alcoólicas','Bebidas Não Alcoólicas','Cervejas','Vinhos','Carnes e Pescados','Hortifruti','Insumos Alimentos','Descartáveis e Embalagens','Limpeza','Pães'];
     const cats=CATS_ORDER.filter(c=>_ins.some(i=>i.categoria===c));
     let filtCat='Todos';let filtBusca='';
     const tabW=div('tabs');
     function mkCatTabs(){
       tabW.innerHTML='';
       ['Todos',...cats].forEach(cat=>{
-        const LABELS={'Bebidas Alcoólicas':'Alcoólicas','Bebidas Não Alcoólicas':'Não Alcoólicas','Cervejas':'Cervejas','Vinhos':'Vinhos','Carnes e Pescados':'Carnes','Hortifruti':'Hortifruti','Insumos Alimentos':'Alimentos','Limpeza':'Limpeza','Pães':'Pães'};
+        const LABELS={'Bebidas Alcoólicas':'Alcoólicas','Bebidas Não Alcoólicas':'Não Alcoólicas','Cervejas':'Cervejas','Vinhos':'Vinhos','Carnes e Pescados':'Carnes','Hortifruti':'Hortifruti','Insumos Alimentos':'Alimentos','Descartáveis e Embalagens':'Descartáveis','Limpeza':'Limpeza','Pães':'Pães'};
         const p=span('tp'+(cat===filtCat?' active':''),cat==='Todos'?'Todos':(LABELS[cat]||cat));
         p.addEventListener('click',()=>{filtCat=cat;mkCatTabs();drawIns($('#ins-t'));});
         tabW.appendChild(p);
@@ -657,7 +661,7 @@ async function pgIns(c){
       if(filtCat==='Todos'){
         const grupos={};f.forEach(i=>{if(!grupos[i.categoria])grupos[i.categoria]=[];grupos[i.categoria].push(i);});
         Object.entries(grupos).forEach(([cat,itens])=>{
-          w.appendChild(div('mt3 mb3',el('span','bct bold',cat,{style:'font-size:11px;letter-spacing:1px;'})));
+          w.appendChild(el('div','ins-sec',null,{html:'<span>'+String(cat).replace(/_/g,' ')+'</span><span class="ins-sec-ct">'+itens.length+' insumos</span>'}));
           w.appendChild(mkInsTable(itens));
         });
       }else{
@@ -679,7 +683,7 @@ function mkInsTable(itens){
     const info=div('ins-info');
     info.appendChild(div('ins-nome',[i.nome]));
     const meta=div('ins-meta');
-    meta.appendChild(bq(i.categoria.split(' ')[0],'bct'));
+    (function(){var c=(i.categoria||'').toLowerCase();var cls='catc-def',ic='ph-tag';if(c.indexOf('hortifr')>=0){cls='catc-hort';ic='ph-carrot';}else if(c.indexOf('carne')>=0||c.indexOf('pescad')>=0||c.indexOf('resfriad')>=0){cls='catc-carne';ic='ph-cow';}else if(c.indexOf('vinho')>=0){cls='catc-vinho';ic='ph-wine';}else if(c.indexOf('cerveja')>=0||c.indexOf('chopp')>=0){cls='catc-cerv';ic='ph-beer-bottle';}else if(c.indexOf('bebida')>=0){cls='catc-beb';ic='ph-drop';}else if(c.indexOf('limpeza')>=0){cls='catc-limp';ic='ph-spray-bottle';}else if(c.indexOf('descart')>=0||c.indexOf('embalagem')>=0){cls='catc-desc';ic='ph-package';}else if(c.indexOf('pae')>=0||c.indexOf('pães')>=0||c.indexOf('pão')>=0){cls='catc-paes';ic='ph-bread';}else if(c.indexOf('aliment')>=0||c.indexOf('seco')>=0||c.indexOf('tempero')>=0){cls='catc-alim';ic='ph-jar';}var lb=String(i.categoria||'').replace(/_/g,' ');meta.appendChild(el('span','ins-cat '+cls,null,{html:'<i class="ph-duotone '+ic+'"></i> '+lb}));})();
     meta.appendChild(span('ins-un','por '+unCusto));
     info.appendChild(meta);
     top.appendChild(info);
