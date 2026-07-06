@@ -1234,8 +1234,8 @@ function drawPP(w){
     const l2=document.createElement('div');l2.style.cssText='display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px';
     function mkInfo(lbl,val,cor){
       const d=document.createElement('div');
-      const lt=document.createElement('div');lt.style.cssText='font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:1px';lt.textContent=lbl;
-      const vt=document.createElement('div');vt.style.cssText='font-size:13px;font-weight:700'+(cor?';color:'+cor:'');vt.textContent=val;
+      const lt=document.createElement('div');lt.style.cssText='font-size:10px;color:#B79A8E;text-transform:uppercase;letter-spacing:1px';lt.textContent=lbl;
+      const vt=document.createElement('div');vt.style.cssText=(cor?"font-family:'Fraunces',serif;font-size:16px;font-weight:600;color:"+cor:'font-size:13px;font-weight:700');vt.textContent=val;
       d.appendChild(lt);d.appendChild(vt);return d;
     }
     const rendStr=N(p.rendimento_qtd,0)+(p.rendimento_un?' '+p.rendimento_un:'')+(numPorcoes!=='—'?' ('+numPorcoes+' por\u00E7\u00F5es)':'');
@@ -1247,20 +1247,13 @@ function drawPP(w){
     card.appendChild(l2);
 
     // Linha 3: botões
-    const btns=document.createElement('div');btns.style.cssText='display:flex;gap:6px;flex-wrap:wrap;align-items:center';
-    const bMk2=btn('btn bg bsm',p.revisar?'\u26A0\uFE0F Revisar':'\u26A0\uFE0F',()=>modalRevisarFicha('pp',p));
-    if(p.revisar){bMk2.style.cssText='padding:3px 8px;border-radius:50px;background:#fef3c7;color:#92400e;font-size:11px;font-weight:700;border:1.5px solid #fcd34d;white-space:nowrap;cursor:pointer';}
-    bMk2.title=p.revisar?p.revisar_motivo||'':'Marcar para revisar';
-    btns.appendChild(bMk2);
-    btns.appendChild(btn('btn bg bsm','\u{1F4CB}',()=>verFichaPrep(p)));
-    btns.appendChild(btn('btn bg bsm','\u270F\uFE0F',()=>modalPrep(p)));
-    btns.appendChild(btn('btn bd bsm','\u{1F5D1}',async()=>{
-      if(!confirm('Excluir "'+p.nome+'"?'))return;
-      await db('lola_preproducoes','PATCH',{ativo:false},'?id=eq.'+p.id);
-      _pp=await db('lola_preproducoes','GET',null,'?select=*&ativo=eq.true&order=nome.asc');
-      drawPP($('#pp-t'));
-    }));
-    card.appendChild(btns);
+    const btns=div('ins-btns');
+const bMk2=el('button','ins-ab'+(p.revisar?' warn':''),null,{html:'<i class="ph-duotone ph-warning"></i>',title:p.revisar?(p.revisar_motivo||'Revisar'):'Marcar para revisar',onclick:()=>modalRevisarFicha('pp',p)});
+btns.appendChild(bMk2);
+btns.appendChild(el('button','ins-ab',null,{html:'<i class="ph-duotone ph-eye"></i>',title:'Ver',onclick:()=>verFichaPrep(p)}));
+btns.appendChild(el('button','ins-ab',null,{html:'<i class="ph-duotone ph-pencil-simple"></i>',title:'Editar',onclick:()=>modalPrep(p)}));
+btns.appendChild(el('button','ins-ab del',null,{html:'<i class="ph-duotone ph-trash"></i>',title:'Excluir',onclick:async()=>{if(!confirm('Excluir "'+p.nome+'"?'))return;await db('lola_preproducoes','PATCH',{ativo:false},'?id=eq.'+p.id);_pp=await db('lola_preproducoes','GET',null,'?select=*&ativo=eq.true&order=nome.asc');drawPP($('#pp-t'));}}));
+card.appendChild(btns);
     w.appendChild(card);
   });
 }
@@ -1705,8 +1698,8 @@ function drawFT(w){
     const l2=document.createElement('div');l2.style.cssText='display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px';
     function mkInfo(lbl,val,cor){
       const d=document.createElement('div');
-      const lt=document.createElement('div');lt.style.cssText='font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:1px';lt.textContent=lbl;
-      const vt=document.createElement('div');vt.style.cssText='font-size:13px;font-weight:700'+(cor?';color:'+cor:'');vt.textContent=val;
+      const lt=document.createElement('div');lt.style.cssText='font-size:10px;color:#B79A8E;text-transform:uppercase;letter-spacing:1px';lt.textContent=lbl;
+      const vt=document.createElement('div');vt.style.cssText=(cor?"font-family:'Fraunces',serif;font-size:16px;font-weight:600;color:"+cor:'font-size:13px;font-weight:700');vt.textContent=val;
       d.appendChild(lt);d.appendChild(vt);return d;
     }
     l2.appendChild(mkInfo('Custo/porção',R(x.custo_por_porcao),'var(--v)'));
