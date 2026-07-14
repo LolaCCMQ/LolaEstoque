@@ -4815,9 +4815,11 @@ async function modalNovoPedido(){
     mkGrupo('🍳 Pré-produções',ppDest,
       x=>{
         const ru=x.rendimento_un||'un';
+        const bulk=['g','ml','kg','L'].includes(ru);
         const porcaoQtd=parseFloat(x.porcao_qtd)||0;
         const porcaoUn=x.porcao_un||'';
-        if(porcaoQtd>0&&porcaoUn&&porcaoUn!==ru){
+        // Porção só quando o rendimento é a GRANEL (g/ml/kg/L). Se rende em un/porção, pede pela unidade.
+        if(bulk&&porcaoQtd>0&&porcaoUn&&porcaoUn!==ru){
           const numP=(parseFloat(x.rendimento_qtd)||1)/porcaoQtd;
           return (parseFloat(x.custo_total||0)/numP)/(parseFloat(x.margem_venda||70)/100);
         }
@@ -4825,9 +4827,10 @@ async function modalNovoPedido(){
       },
       x=>{
         const ru=x.rendimento_un||'un';
+        const bulk=['g','ml','kg','L'].includes(ru);
         const porcaoQtd=parseFloat(x.porcao_qtd)||0;
         const porcaoUn=x.porcao_un||'';
-        if(porcaoQtd>0&&porcaoUn&&porcaoUn!==ru) return porcaoUn==='un'?'porção':porcaoUn;
+        if(bulk&&porcaoQtd>0&&porcaoUn&&porcaoUn!==ru) return porcaoUn==='un'?'porção':porcaoUn;
         return ru==='g'?'kg':ru==='ml'?'L':ru;
       },
       x=>'pp_'+x.id,
