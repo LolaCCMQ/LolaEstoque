@@ -27,6 +27,7 @@ body{font-family:'Hanken Grotesk',sans-serif;background:var(--rf);color:var(--tx
 .ni:hover{background:var(--rf);color:var(--v);}
 .ni.active{background:var(--rt);color:var(--v);border-left-color:var(--v);font-weight:700;}
 .ni i{font-size:18px;flex-shrink:0;}
+.ni-badge{margin-left:auto;background:var(--v);color:#fff;font-size:11px;font-weight:800;min-width:20px;height:20px;padding:0 6px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;}
 .main{flex:1;padding:22px 22px;overflow-x:hidden;}
 .ph{margin-bottom:18px;}
 .ph h2{font-family:'Fraunces',serif;font-size:23px;font-weight:700;color:var(--v);}
@@ -455,25 +456,27 @@ const LOGO_SVG=`<?xml version="1.0" encoding="utf-8"?>
       {id:'saidas',ic:'ph-arrow-square-out',lb:'Saída de Estoque'},
       {id:'fornecedores',ic:'ph-storefront',lb:'Fornecedores'},
       {id:'pedidos',ic:'ph-shopping-cart',lb:'Pedidos à Central'},
+      {id:'envios',ic:'ph-tray-arrow-down',lb:'Envios da Central'},
     ]},
   ];
   const sb=el('aside','sidebar');
   menus.forEach(m=>{
     sb.appendChild(span('ns',m.s));
     m.items.forEach(it=>{
-      const ni=el('div','ni'+(it.id===PAGE?' active':''),null,{html:'<i class="ph-duotone '+it.ic+'"></i><span>'+it.lb+'</span>'});
+      const ni=el('div','ni'+(it.id===PAGE?' active':''),null,{html:'<i class="ph-duotone '+it.ic+'"></i><span>'+it.lb+'</span>'+(it.id==='envios'?'<span class="ni-badge" id="enviosBadge" style="display:none"></span>':'')});
       ni.dataset.page=it.id;
       ni.addEventListener('click',()=>{closeSidebar();nav(it.id);});
       sb.appendChild(ni);
     });
   });
+  updEnviosBadge();
   app.appendChild(tb);
   app.appendChild(div('app-body',[sb,el('main','main',null,{id:'main'})]));
 }
 
 
-const TITLES={dashboard:'Cozinha',insumos:'Insumos',conferencia:'Conferência de Preços',preproducoes:'Pré-produções',fichas:'Fichas Técnicas',producao:'Produção do dia',contagem:'Contagem de Estoque',saidas:'Saída de Estoque',fornecedores:'Fornecedores',pedidos:'Pedidos à Central'};
-const SUBS={dashboard:'Visão geral das operações',insumos:'Ingredientes e matérias-primas com custo real',conferencia:'Suba a planilha do mês e confira preço por preço antes de aplicar',preproducoes:'Fichas técnicas dos preparos da cozinha',fichas:'Composição e custo dos pratos do cardápio',producao:'O que a Cozinha Central produziu hoje',contagem:'Registro de estoque do CCMQ e Mac',saidas:'Registro de saídas de insumos do estoque',fornecedores:'Cadastro e gestão de fornecedores',pedidos:'Pedidos entre unidades e Cozinha Central'};
+const TITLES={dashboard:'Cozinha',insumos:'Insumos',conferencia:'Conferência de Preços',preproducoes:'Pré-produções',fichas:'Fichas Técnicas',producao:'Produção do dia',contagem:'Contagem de Estoque',saidas:'Saída de Estoque',fornecedores:'Fornecedores',pedidos:'Pedidos à Central',envios:'Envios da Central'};
+const SUBS={dashboard:'Visão geral das operações',insumos:'Ingredientes e matérias-primas com custo real',conferencia:'Suba a planilha do mês e confira preço por preço antes de aplicar',preproducoes:'Fichas técnicas dos preparos da cozinha',fichas:'Composição e custo dos pratos do cardápio',producao:'O que a Cozinha Central produziu hoje',contagem:'Registro de estoque do CCMQ e Mac',saidas:'Registro de saídas de insumos do estoque',fornecedores:'Cadastro e gestão de fornecedores',pedidos:'Pedidos entre unidades e Cozinha Central',envios:'Ingredientes e produções que a Central mandou pra cá'};
 
 function nav(p){PAGE=p;document.querySelectorAll('.ni').forEach(n=>n.classList.toggle('active',n.dataset.page===p));renderPage();}
 
@@ -497,7 +500,7 @@ async function renderPage(){
   main.innerHTML='';
   main.appendChild(brandHead(TITLES[PAGE],SUBS[PAGE]));
   const body=div(null,null,{id:'pb'});main.appendChild(body);
-  const map={dashboard:pgDash,insumos:pgIns,conferencia:pgConferencia,preproducoes:pgPreps,fichas:pgFichas,producao:pgProducao,contagem:pgCont2,saidas:pgSaidas,fornecedores:pgFornecedores,pedidos:pgPed};
+  const map={dashboard:pgDash,insumos:pgIns,conferencia:pgConferencia,preproducoes:pgPreps,fichas:pgFichas,producao:pgProducao,contagem:pgCont2,saidas:pgSaidas,fornecedores:pgFornecedores,pedidos:pgPed,envios:pgEnvios};
   if(map[PAGE])await map[PAGE](body);
 }
 
@@ -4246,6 +4249,106 @@ const COST_EMOJI={'Carnes e Pescados':'🥩','Frituras e Empanados':'🍤','Lati
 function costCatLabel(x){return ((COST_EMOJI[x]||'')+' '+x).trim();}
 const INS_TO_COST={'carnes':'Carnes e Pescados','Carnes e Pescados':'Carnes e Pescados','resfriados':'Carnes e Pescados','hortifruti':'Hortifrúti e Conservas','Hortifruti':'Hortifrúti e Conservas','paes':'Massas, Pães e Acompanhamentos','Pães':'Massas, Pães e Acompanhamentos','Insumos Alimentos':'Temperos e Outros','secos':'Temperos e Outros'};
 
+/* ══════════════════════════════════
+   ENVIOS DA CENTRAL (o que a Central mandou pro CCMQ)
+══════════════════════════════════ */
+async function updEnviosBadge(){
+  try{
+    const r=await db('lola_central_envio_ccmq','GET',null,'?select=id&ativo=neq.false&atendido=eq.false');
+    const b=$('#enviosBadge'); if(!b)return;
+    if(r.length){b.style.display='';b.textContent=r.length;}else b.style.display='none';
+  }catch(e){}
+}
+const _envEsc=s=>String(s==null?'':s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+function _envQtd(q){return N(q,3).replace(/,?0+$/,'')||'0';}
+async function pgEnvios(c){
+  c.appendChild(ld());
+  try{
+    const envios=await db('lola_central_envio_ccmq','GET',null,'?select=*&ativo=neq.false&order=atendido.asc,data.desc,criado_em.desc');
+    const insIds=[...new Set(envios.filter(e=>e.insumo_id).map(e=>e.insumo_id))];
+    let custoMap={};
+    if(insIds.length){
+      const ins=await db('lola_insumos','GET',null,'?select=id,nome,custo_por_unidade,unidade_custo&id=in.('+insIds.join(',')+')');
+      ins.forEach(i=>custoMap[i.id]=i);
+    }
+    c.innerHTML='';
+    const pend=envios.filter(e=>!e.atendido), feitos=envios.filter(e=>e.atendido);
+
+    const note=div(null);
+    note.style.cssText='background:var(--rf);border:1px solid var(--rb);border-radius:12px;padding:12px 14px;margin-bottom:14px;font-size:12.5px;color:var(--ts);line-height:1.5';
+    note.innerHTML='<i class="ph-duotone ph-info" style="color:var(--v)"></i> O que a <b>Cozinha Central</b> mandou pro CCMQ. Ao marcar <b>Recebido</b>, o custo sai do estoque da Central e a transferência é lançada no <b>Financeiro</b> das duas contas.';
+    c.appendChild(note);
+
+    if(!envios.length){
+      const empt=div(null);empt.style.cssText='text-align:center;padding:36px 16px;color:var(--ts)';
+      empt.innerHTML='<div style="font-size:34px;color:var(--rm)"><i class="ph-duotone ph-tray"></i></div><div style="margin-top:8px;font-weight:700">Nada da Central por enquanto.</div><div style="font-size:12px;margin-top:4px">Quando o Arthur enviar algo, aparece aqui.</div>';
+      c.appendChild(empt);
+      return;
+    }
+
+    function card(e){
+      const custoInfo=e.insumo_id&&custoMap[e.insumo_id]?custoMap[e.insumo_id]:null;
+      const custoUnit=custoInfo?Number(custoInfo.custo_por_unidade||0):0;
+      const custoTot=e.custo_total!=null?Number(e.custo_total):((e.quantidade&&custoUnit)?e.quantidade*custoUnit:0);
+      const wrap=div(null);
+      wrap.style.cssText='background:#fff;border:1.5px solid var(--rb);border-radius:14px;padding:14px 16px;margin-bottom:10px'+(e.atendido?';opacity:.72':'');
+      let html='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">';
+      html+='<b style="font-size:15px;color:var(--tx)">'+_envEsc(e.descricao)+'</b>';
+      if(e.quantidade)html+='<span style="background:var(--rt);color:var(--v);font-size:12px;font-weight:800;padding:3px 10px;border-radius:50px">'+_envQtd(e.quantidade)+' '+_envEsc(e.unidade||'')+'</span>';
+      if(e.atendido)html+='<span style="margin-left:auto;background:#dcfce7;color:#166534;font-size:11px;font-weight:700;padding:3px 10px;border-radius:50px"><i class="ph-duotone ph-check-circle"></i> recebido</span>';
+      html+='</div>';
+      if(e.prato)html+='<div style="font-size:12px;color:var(--ts);margin-bottom:3px"><i class="ph-duotone ph-fork-knife" style="color:var(--v)"></i> Prato: <b>'+_envEsc(e.prato)+'</b></div>';
+      html+='<div style="font-size:12px;color:var(--ts);margin-bottom:3px"><i class="ph-duotone ph-calendar" style="color:var(--v)"></i> Enviado '+DBR(String(e.data).slice(0,10))+(e.responsavel?' · '+_envEsc(e.responsavel):'')+'</div>';
+      if(e.observacao)html+='<div style="font-size:12px;color:var(--ts);margin-bottom:3px"><i class="ph-duotone ph-note" style="color:var(--v)"></i> '+_envEsc(e.observacao)+'</div>';
+      if(custoTot>0)html+='<div style="font-size:12px;color:var(--ts)"><i class="ph-duotone ph-currency-circle-dollar" style="color:var(--v)"></i> Custo estimado: <b>'+R(custoTot)+'</b></div>';
+      if(e.atendido&&e.recebido_por)html+='<div style="font-size:11px;color:var(--rm);margin-top:5px">Recebido por '+_envEsc(e.recebido_por)+(e.recebido_em?' · '+new Date(e.recebido_em).toLocaleDateString('pt-BR'):'')+'</div>';
+      wrap.innerHTML=html;
+      const acts=div(null);
+      if(!e.atendido){
+        acts.style.cssText='display:flex;gap:8px;margin-top:12px';
+        const bRec=el('button','btn bp',null,{html:'<i class="ph-duotone ph-check"></i> Recebido'});
+        bRec.style.cssText='flex:1;padding:11px;font-size:13px;font-weight:800';
+        bRec.onclick=()=>receberEnvio(e,custoInfo);
+        acts.appendChild(bRec);
+      } else {
+        acts.style.cssText='margin-top:10px';
+        const bUndo=el('button','btn bo bsm',null,{html:'<i class="ph-duotone ph-arrow-counter-clockwise"></i> Desfazer recebimento'});
+        bUndo.style.cssText='font-size:12px';
+        bUndo.onclick=()=>desfazerEnvio(e);
+        acts.appendChild(bUndo);
+      }
+      wrap.appendChild(acts);
+      return wrap;
+    }
+
+    if(pend.length){
+      c.appendChild(el('div',null,null,{html:'A receber ('+pend.length+')',style:'font-size:12px;font-weight:800;color:var(--v);margin:6px 0 8px;text-transform:uppercase;letter-spacing:1px'}));
+      pend.forEach(e=>c.appendChild(card(e)));
+    }
+    if(feitos.length){
+      c.appendChild(el('div',null,null,{html:'Recebidos ('+feitos.length+')',style:'font-size:12px;font-weight:800;color:var(--rm);margin:18px 0 8px;text-transform:uppercase;letter-spacing:1px'}));
+      feitos.forEach(e=>c.appendChild(card(e)));
+    }
+  }catch(err){c.innerHTML='<div style="padding:20px;color:red;font-weight:700">❌ Erro ao carregar.<br><small>'+_envEsc(err.message)+'</small></div>';}
+}
+async function receberEnvio(e,custoInfo){
+  const custoUnit=custoInfo?Number(custoInfo.custo_por_unidade||0):0;
+  const custoTot=(e.quantidade&&custoUnit)?e.quantidade*custoUnit:0;
+  if(!confirm('Confirmar recebimento de "'+e.descricao+'"'+(custoTot>0?' (custo '+R(custoTot)+')':'')+'?\n\nIsso dá baixa no estoque da Central e lança a transferência no Financeiro das duas contas.'))return;
+  try{
+    await db('rpc/envio_ccmq_receber','POST',{p_envio_id:e.id,p_quem:ME||null});
+    updEnviosBadge();
+    renderPage();
+  }catch(err){alert('Erro ao receber: '+err.message);}
+}
+async function desfazerEnvio(e){
+  if(!confirm('Desfazer o recebimento de "'+e.descricao+'"?\n\nRemove a baixa na Central e os lançamentos de transferência no Financeiro.'))return;
+  try{
+    await db('rpc/envio_ccmq_desfazer','POST',{p_envio_id:e.id});
+    updEnviosBadge();
+    renderPage();
+  }catch(err){alert('Erro ao desfazer: '+err.message);}
+}
 async function pgPed(c){
   c.appendChild(ld());
   try{
