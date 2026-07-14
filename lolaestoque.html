@@ -514,7 +514,7 @@ async function renderPage(){
 async function pgDash(c){
   c.appendChild(ld());
   try{
-    const[ai,af,ap,ar,pr,uc,rv_ft,rv_pp]=await Promise.all([
+    const[ai,af,ap,ar,pr,uc,rv_ft,rv_pp,ev]=await Promise.all([
       db('lola_insumos','GET',null,'?select=id&ativo=eq.true'),
       db('lola_fichas_tecnicas','GET',null,'?select=id&ativo=eq.true'),
       db('lola_pedidos','GET',null,'?select=id&status=in.(em_producao,pronto_entrega)'),
@@ -523,6 +523,7 @@ async function pgDash(c){
       db('lola_contagens','GET',null,'?order=data_contagem.desc&limit=3'),
       db('lola_fichas_tecnicas','GET',null,'?select=id,nome&ativo=eq.true&revisar=eq.true'),
       db('lola_preproducoes','GET',null,'?select=id,nome&ativo=eq.true&revisar=eq.true'),
+      db('lola_central_envio_ccmq','GET',null,'?select=id,descricao,quantidade,unidade,prato,data,responsavel&ativo=neq.false&atendido=eq.false&order=data.desc'),
     ]);
     c.innerHTML='';
     let fichasEl=null, contagensEl=null;
@@ -560,6 +561,24 @@ async function pgDash(c){
         return s;
       })));
       contagensEl=cardCont;
+    }
+    // Card envios da Central chegando (o que a Central mandou pro CCMQ)
+    let envEl=null;
+    if((ev||[]).length){
+      const ec=document.createElement('div');
+      ec.style.cssText='background:#fff;border:1.5px solid var(--rb);border-radius:14px;padding:14px 16px;margin-top:8px';
+      const et=document.createElement('div');et.style.cssText='display:flex;align-items:center;justify-content:space-between;margin-bottom:12px';
+      et.innerHTML='<div style="font-family:Fraunces,serif;font-size:16px;font-weight:600;color:var(--v);display:flex;align-items:center;gap:7px"><i class="ph-duotone ph-tray-arrow-down"></i> Chegando da Central <span style="padding:2px 10px;border-radius:50px;background:var(--v);color:#fff;font-size:12px;font-weight:800">'+ev.length+'</span></div>';
+      const evVer=document.createElement('a');evVer.textContent='Ver todos →';evVer.style.cssText='font-size:11px;color:var(--v);cursor:pointer;text-decoration:none;font-weight:700';evVer.onclick=e=>{e.preventDefault();nav('envios');};
+      et.appendChild(evVer);ec.appendChild(et);
+      ev.forEach(e=>{
+        const row=document.createElement('div');row.style.cssText='padding:11px 13px;border-radius:12px;margin-bottom:8px;background:var(--rf);border:1.5px solid var(--rb);display:flex;align-items:center;gap:10px;flex-wrap:wrap';
+        const info=document.createElement('div');info.style.cssText='flex:1;min-width:0';
+        info.innerHTML='<div style="font-weight:800;color:var(--tx);font-size:14px">'+_envEsc(e.descricao)+(e.quantidade?' <span style="color:var(--v)">· '+_envQtd(e.quantidade)+' '+_envEsc(e.unidade||'')+'</span>':'')+'</div><div style="font-size:11px;color:var(--ts);margin-top:2px">'+(e.prato?_envEsc(e.prato)+' · ':'')+'Enviado '+DBR(String(e.data).slice(0,10))+(e.responsavel?' · '+_envEsc(e.responsavel):'')+'</div>';
+        const bR=btn('btn bp bsm','Receber',()=>receberEnvio(e,null));bR.style.cssText='flex-shrink:0;font-size:12px;font-weight:800;padding:9px 16px';
+        row.appendChild(info);row.appendChild(bR);ec.appendChild(row);
+      });
+      envEl=ec;
     }
     // Card pedidos aguardando central
     const card=document.createElement('div');
@@ -607,7 +626,8 @@ async function pgDash(c){
         card.appendChild(row);
       });
     }
-    // Ordem pedida: pedidos aguardando central > fichas pendentes > ultimas contagens > stats
+    // Ordem: chegando da Central > pedidos aguardando central > fichas pendentes > ultimas contagens
+    if(envEl) c.appendChild(envEl);
     c.appendChild(card);
     if(fichasEl) c.appendChild(fichasEl);
     if(contagensEl) c.appendChild(contagensEl);
@@ -4581,6 +4601,7 @@ async function modalNovoPedido(){
   _pp=await db('lola_preproducoes','GET',null,'?select=id,nome,categoria,rendimento_qtd,rendimento_un,porcao_qtd,porcao_un,custo_total,custo_por_unidade,valor_venda_central,margem_venda,destinos,e_preparo&ativo=eq.true&order=nome.asc');
   _ins=await db('lola_insumos','GET',null,'?select=id,nome,categoria,unidade_compra,unidade_custo,custo_por_unidade,destinos&ativo=eq.true&order=nome.asc');
   const ftPre=await db('lola_fichas_tecnicas','GET',null,'?select=id,nome,custo_por_porcao,rendimento_un,e_preparo&ativo=eq.true&e_preparo=eq.true&order=nome.asc');
+  const _invAll=await db('lola_inv_itens','GET',null,'?select=id,nome,categoria,unidade&ativo=neq.false&order=nome.asc').catch(()=>[]);
 
   const DEST_COR={ccmq:'#AA2B2B',mac:'#166534',eventos:'#c47700'};
   const DEST_LBL={ccmq:'CCMQ',mac:'MAC',eventos:'Evento'};
@@ -4593,6 +4614,8 @@ async function modalNovoPedido(){
 
   // Mapa de quantidades: id -> {item, quantidade}
   const qtdMap={};
+  // Mapa de embalagens/utensílios do inventário: inv_id -> {item, quantidade}
+  const embMap={};
 
   const ov=div('ov');
   const mo=div('mo moxl');
@@ -4784,6 +4807,46 @@ async function modalNovoPedido(){
     totalEl.appendChild(totRow);
   }
 
+  // ── Embalagens / utensílios do inventário (voltam pra Central) ──
+  mb.appendChild(el('hr','dv'));
+  const embTit=div(null);embTit.style.cssText='font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:var(--v);margin-bottom:3px';
+  embTit.innerHTML='<i class="ph-duotone ph-package"></i> Embalagens / utensílios (voltam)';
+  mb.appendChild(embTit);
+  mb.appendChild(div('tss',null,{style:'margin-bottom:8px',html:'Caixas, potes e utensílios do inventário que vão junto e depois precisam voltar.'}));
+  const embBusca=el('input','fi',null,{placeholder:'🔍 Buscar no inventário...',autocomplete:'off'});
+  embBusca.style.cssText='width:100%;margin-bottom:8px';
+  let _buscaEmb='';
+  embBusca.addEventListener('input',e=>{_buscaEmb=e.target.value.toLowerCase();buildEmb();});
+  mb.appendChild(embBusca);
+  const embArea=div(null);mb.appendChild(embArea);
+  function embRow(item){
+    const id=item.id;
+    if(!embMap[id])embMap[id]={item,quantidade:''};
+    const row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;margin-bottom:4px;background:var(--rf);border:1px solid var(--rb)';
+    const info=document.createElement('div');info.style.cssText='flex:1;min-width:0';
+    info.innerHTML='<div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_envEsc(item.nome)+'</div>'+(item.categoria?'<div style="font-size:11px;color:var(--ts)">'+_envEsc(item.categoria)+'</div>':'');
+    const inp=document.createElement('input');inp.type='number';inp.min='0';inp.step='1';inp.placeholder='0';inp.value=embMap[id].quantidade||'';inp.setAttribute('inputmode','numeric');
+    inp.style.cssText='width:80px;padding:8px;border:2px solid var(--rb);border-radius:10px;font-size:15px;text-align:center;font-weight:700;-webkit-appearance:none';
+    if(embMap[id].quantidade>0)inp.style.borderColor='var(--v)';
+    inp.addEventListener('input',e=>{embMap[id].quantidade=parseFloat(e.target.value)||0;inp.style.borderColor=embMap[id].quantidade>0?'var(--v)':'var(--rb)';});
+    const un=document.createElement('div');un.style.cssText='font-size:11px;color:var(--ts);width:30px;font-weight:600';un.textContent=item.unidade||'un';
+    row.appendChild(info);row.appendChild(inp);row.appendChild(un);
+    return row;
+  }
+  function buildEmb(){
+    embArea.innerHTML='';
+    const sel=_invAll.filter(x=>embMap[x.id]&&embMap[x.id].quantidade>0);
+    const selIds=new Set(sel.map(x=>x.id));
+    if(sel.length){const g=div(null);g.style.cssText='margin-bottom:8px';sel.forEach(it=>g.appendChild(embRow(it)));embArea.appendChild(g);}
+    if(_buscaEmb){
+      const matches=_invAll.filter(x=>!selIds.has(x.id)&&x.nome.toLowerCase().includes(_buscaEmb)).slice(0,20);
+      if(matches.length){const g=div(null);matches.forEach(it=>g.appendChild(embRow(it)));embArea.appendChild(g);}
+      else embArea.appendChild(div('tss',null,{style:'padding:8px',html:'Nada encontrado no inventário.'}));
+    }
+  }
+  buildEmb();
+
   // Rodapé: responsável + obs
   mb.appendChild(el('hr','dv'));
   const inpResp=el('input','fi',null,{type:'text',placeholder:'Seu nome (obrigatório)'});
@@ -4817,6 +4880,10 @@ async function modalNovoPedido(){
           unidade:v.unidade,
           preco_unitario:v.preco,
         });
+      }
+      const embs=Object.values(embMap).filter(v=>v.quantidade>0);
+      if(embs.length){
+        await db('lola_pedido_embalagens','POST',embs.map(v=>({pedido_id:ped.id,inv_item_id:v.item.id,nome:v.item.nome,unidade:v.item.unidade||'un',quantidade:v.quantidade})));
       }
       _peds=await db('lola_pedidos','GET',null,'?select=*&order=created_at.desc');
       drawPed($('#ped-t'));
@@ -5098,7 +5165,35 @@ async function editarPedido(ped){
 
 async function verPedido(ped){
   const itens=await db('lola_pedidos_itens','GET',null,'?select=*&pedido_id=eq.'+ped.id);
+  const embs=await db('lola_pedido_embalagens','GET',null,'?select=*&pedido_id=eq.'+ped.id+'&order=nome.asc').catch(()=>[]);
   const destLabel=ped.unidade==='ccmq'?'CCMQ':ped.unidade==='mac'?'Mac':(ped.destinatario||ped.unidade);
+  let embSection=null;
+  if((embs||[]).length){
+    embSection=div(null);embSection.style.cssText='margin-top:16px';
+    const pend=embs.filter(e=>!e.devolvido).length;
+    embSection.appendChild(div(null,null,{style:'font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:var(--v);margin-bottom:8px',html:'<i class="ph-duotone ph-package"></i> Embalagens / utensílios (voltam)'+(pend?' <span style="background:#FBF0DD;color:#9A6B1E;padding:1px 8px;border-radius:50px;font-size:10px">'+pend+' a voltar</span>':' <span style="background:#dcfce7;color:#166534;padding:1px 8px;border-radius:50px;font-size:10px">tudo devolvido</span>')}));
+    embs.forEach(em=>{
+      const row=div(null);row.style.cssText='display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:10px;margin-bottom:6px;background:var(--rf);border:1px solid var(--rb)';
+      const info=div(null);info.style.cssText='flex:1;min-width:0';
+      const b=btn('','',()=>{});
+      function paint(){
+        info.innerHTML='<div style="font-weight:700;font-size:13px">'+_envEsc(em.nome)+' <span style="color:var(--v)">· '+N(em.quantidade,0)+' '+_envEsc(em.unidade||'un')+'</span></div>'+(em.devolvido?'<div style="font-size:11px;color:#166534">✓ devolvido'+(em.devolvido_em?' '+new Date(em.devolvido_em).toLocaleDateString('pt-BR'):'')+(em.devolvido_por?' · '+_envEsc(em.devolvido_por):'')+'</div>':'<div style="font-size:11px;color:#9A6B1E">aguardando devolução</div>');
+        b.textContent=em.devolvido?'Reabrir':'Devolvido';
+        b.className='btn '+(em.devolvido?'bo':'bp')+' bsm';
+        b.style.cssText='flex-shrink:0;font-size:12px;font-weight:800';
+      }
+      b.onclick=async()=>{
+        const novo=!em.devolvido;b.disabled=true;
+        try{
+          await db('lola_pedido_embalagens','PATCH',{devolvido:novo,devolvido_em:novo?new Date().toISOString():null,devolvido_por:novo?(ME||null):null},'?id=eq.'+em.id);
+          em.devolvido=novo;em.devolvido_em=novo?new Date().toISOString():null;em.devolvido_por=novo?(ME||null):null;paint();
+        }catch(e){alert('Erro: '+e.message);}
+        b.disabled=false;
+      };
+      paint();
+      row.appendChild(info);row.appendChild(b);embSection.appendChild(row);
+    });
+  }
   mkModal('📋 Pedido #'+ped.numero_pedido+' — '+destLabel,[
     div('g3 mb3',[
       div('custo-box',[span('scl','Destino'),div('bold mt2',destLabel)]),
@@ -5121,12 +5216,24 @@ async function verPedido(ped){
       el('strong',null,'TOTAL'),
       el('strong','tv',R(ped.valor_total),{style:'font-size:20px'}),
     ]),
+    ...(embSection?[embSection]:[]),
   ],null,'mo mol');
 }
 
 async function imprimirPed(ped){
   const itens=await db('lola_pedidos_itens','GET',null,'?select=*&pedido_id=eq.'+ped.id);
+  const embs=await db('lola_pedido_embalagens','GET',null,'?select=*&pedido_id=eq.'+ped.id+'&order=nome.asc').catch(()=>[]);
   const destLabel=ped.unidade==='ccmq'?'CCMQ':ped.unidade==='mac'?'Mac':(ped.destinatario||ped.unidade);
+  const embHtml=(embs||[]).length?`
+    <div style="font-size:11px;font-weight:800;letter-spacing:1px;color:#AA2B2B;margin:0 0 6px">EMBALAGENS / UTENSÍLIOS — DEVOLVER À CENTRAL</div>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:18px;border:1px solid #f2dada">
+      <thead><tr style="background:#fdf3f3">
+        <th style="padding:8px 11px;text-align:left;font-size:11px">ITEM</th>
+        <th style="padding:8px 11px;text-align:center;font-size:11px;width:70px">QTD</th>
+        <th style="padding:8px 11px;text-align:center;font-size:11px;width:90px">DEVOLVIDO?</th>
+      </tr></thead>
+      <tbody>${embs.map((e,i)=>`<tr style="border-bottom:1px solid #f2dada;background:${i%2===0?'#fff8f8':'#fff'}"><td style="padding:8px 11px;font-size:12px;font-weight:600">${e.nome||'—'}</td><td style="padding:8px 11px;text-align:center;font-size:12px">${N(e.quantidade,0)} ${e.unidade||'un'}</td><td style="padding:8px 11px;text-align:center;font-size:14px">☐</td></tr>`).join('')}</tbody>
+    </table>`:'';
   const rows=itens.map((it,i)=>`
     <tr style="border-bottom:1px solid #f2dada;background:${i%2===0?'#fff8f8':'#fff'}">
       <td style="padding:9px 11px;font-size:12px;font-weight:600">${it.nome_item||'—'}</td>
@@ -5163,6 +5270,7 @@ async function imprimirPed(ped){
         </tr>
       </tfoot>
     </table>
+    ${embHtml}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:50px;margin-top:36px">
       <div><div style="border-top:1.5px solid #AA2B2B;padding-top:8px;text-align:center;font-size:11px;color:#7a5a5a">Assinatura — ${destLabel}</div></div>
       <div><div style="border-top:1.5px solid #AA2B2B;padding-top:8px;text-align:center;font-size:11px;color:#7a5a5a">Assinatura — Cozinha Central</div></div>
