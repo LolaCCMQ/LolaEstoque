@@ -4387,7 +4387,7 @@ async function pgEntradaNotas(c){
   c.appendChild(ld());
   try{
     const [notas,lancadas,mapa,insumos]=await Promise.all([
-      db('financeiro_notas','GET',null,'?unit=eq.ccmq&select=chave,emitente,numero,data_emissao,valor_total,itens&order=data_emissao.desc'),
+      db('rpc/ccmq_notas_estoque','POST',{}),
       db('lola_ccmq_estoque_nota','GET',null,'?select=chave'),
       db('lola_ccmq_estoque_map','GET',null,'?select=desc_norm,insumo_id,fator'),
       db('lola_insumos','GET',null,'?select=id,nome,categoria,unidade_compra,unidade_custo,custo_por_unidade&ativo=eq.true&order=nome.asc')
