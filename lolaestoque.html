@@ -456,6 +456,7 @@ const LOGO_SVG=`<?xml version="1.0" encoding="utf-8"?>
       {id:'fichas',ic:'ph-book-open',lb:'Fichas Técnicas'},
     ]},
     {s:'Operações',items:[
+      {id:'entnotas',ic:'ph-receipt',lb:'Entrada de Notas'},
       {id:'contagem',ic:'ph-package',lb:'Contagem Estoque'},
       {id:'saidas',ic:'ph-arrow-square-out',lb:'Saída de Estoque'},
       {id:'fornecedores',ic:'ph-storefront',lb:'Fornecedores'},
@@ -479,8 +480,8 @@ const LOGO_SVG=`<?xml version="1.0" encoding="utf-8"?>
 }
 
 
-const TITLES={dashboard:'Cozinha',insumos:'Insumos',conferencia:'Conferência de Preços',preproducoes:'Pré-produções',fichas:'Fichas Técnicas',producao:'Produção do dia',contagem:'Contagem de Estoque',saidas:'Saída de Estoque',fornecedores:'Fornecedores',pedidos:'Pedidos à Central',envios:'Envios da Central'};
-const SUBS={dashboard:'Visão geral das operações',insumos:'Ingredientes e matérias-primas com custo real',conferencia:'Suba a planilha do mês e confira preço por preço antes de aplicar',preproducoes:'Fichas técnicas dos preparos da cozinha',fichas:'Composição e custo dos pratos do cardápio',producao:'O que a Cozinha Central produziu hoje',contagem:'Registro de estoque do CCMQ e Mac',saidas:'Registro de saídas de insumos do estoque',fornecedores:'Cadastro e gestão de fornecedores',pedidos:'Pedidos entre unidades e Cozinha Central',envios:'Ingredientes e produções que a Central mandou pra cá'};
+const TITLES={dashboard:'Cozinha',insumos:'Insumos',conferencia:'Conferência de Preços',preproducoes:'Pré-produções',fichas:'Fichas Técnicas',producao:'Produção do dia',contagem:'Contagem de Estoque',saidas:'Saída de Estoque',fornecedores:'Fornecedores',pedidos:'Pedidos à Central',envios:'Envios da Central',entnotas:'Entrada de Notas'};
+const SUBS={dashboard:'Visão geral das operações',insumos:'Ingredientes e matérias-primas com custo real',conferencia:'Suba a planilha do mês e confira preço por preço antes de aplicar',preproducoes:'Fichas técnicas dos preparos da cozinha',fichas:'Composição e custo dos pratos do cardápio',producao:'O que a Cozinha Central produziu hoje',contagem:'Registro de estoque do CCMQ e Mac',saidas:'Registro de saídas de insumos do estoque',fornecedores:'Cadastro e gestão de fornecedores',pedidos:'Pedidos entre unidades e Cozinha Central',envios:'Ingredientes e produções que a Central mandou pra cá',entnotas:'Puxa as notas do Financeiro e lança no estoque'};
 
 function nav(p){PAGE=p;document.querySelectorAll('.ni').forEach(n=>n.classList.toggle('active',n.dataset.page===p));renderPage();}
 
@@ -504,7 +505,7 @@ async function renderPage(){
   main.innerHTML='';
   main.appendChild(brandHead(TITLES[PAGE],SUBS[PAGE]));
   const body=div(null,null,{id:'pb'});main.appendChild(body);
-  const map={dashboard:pgDash,insumos:pgIns,conferencia:pgConferencia,preproducoes:pgPreps,fichas:pgFichas,producao:pgProducao,contagem:pgCont2,saidas:pgSaidas,fornecedores:pgFornecedores,pedidos:pgPed,envios:pgEnvios};
+  const map={dashboard:pgDash,insumos:pgIns,conferencia:pgConferencia,preproducoes:pgPreps,fichas:pgFichas,producao:pgProducao,contagem:pgCont2,saidas:pgSaidas,fornecedores:pgFornecedores,pedidos:pgPed,envios:pgEnvios,entnotas:pgEntradaNotas};
   if(map[PAGE])await map[PAGE](body);
 }
 
@@ -4372,6 +4373,112 @@ async function desfazerEnvio(e){
     updEnviosBadge();
     renderPage();
   }catch(err){alert('Erro ao desfazer: '+err.message);}
+}
+/* ══════════════════════════════════
+   ENTRADA DE NOTAS — estoque CCMQ a partir das notas do Financeiro
+   (item da nota -> insumo existente ou novo; guarda qtd+preço; fator; atualiza preço)
+══════════════════════════════════ */
+const EN_CATS=["Insumos Alimentos","Hortifruti","Carnes e Pescados","Não Alcoólicos","Bebidas Alcoólicas","Vinhos","Cervejas","Cafés","Pães","Lojinha","Material de Limpeza","Descartáveis/Embalagens","Material de Expediente e Gráfico","Utensílios e Equipamentos","Gás"];
+const _jnorm=s=>(s==null?'':String(s)).trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ');
+let EN=null,_enComp='';
+function _enMesLbl(m){const M=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];const p=m.split('-');return M[(+p[1])-1]+'/'+p[0].slice(2);}
+function _enQ(q){return N(q,3).replace(/,?0+$/,'')||'0';}
+async function pgEntradaNotas(c){
+  c.appendChild(ld());
+  try{
+    const [notas,lancadas,mapa,insumos]=await Promise.all([
+      db('financeiro_notas','GET',null,'?unit=eq.ccmq&select=chave,emitente,numero,data_emissao,valor_total,itens&order=data_emissao.desc'),
+      db('lola_ccmq_estoque_nota','GET',null,'?select=chave'),
+      db('lola_ccmq_estoque_map','GET',null,'?select=desc_norm,insumo_id,fator'),
+      db('lola_insumos','GET',null,'?select=id,nome,categoria,unidade_compra,unidade_custo,custo_por_unidade&ativo=eq.true&order=nome.asc')
+    ]);
+    const lanSet=new Set(lancadas.map(x=>x.chave));
+    const mapByKey={};mapa.forEach(m=>mapByKey[m.desc_norm]=m);
+    const insByName={},insById={};insumos.forEach(i=>{insByName[_jnorm(i.nome)]=i;insById[i.id]=i;});
+    EN={notas,lanSet,mapByKey,insByName,insById,insumos};
+    c.innerHTML='';
+    const note=div(null);note.style.cssText='background:var(--rf);border:1px solid var(--rb);border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:12.5px;color:var(--ts);line-height:1.5';
+    note.innerHTML='<i class="ph-duotone ph-info" style="color:var(--v)"></i> As notas vêm do <b>Financeiro</b> — você não digita de novo. Abra cada nota e confirme a qual <b>insumo</b> cada item corresponde (ou crie um novo). O sistema lança a entrada, converte pela unidade (fator) e atualiza o preço do insumo. Feito uma vez, o item já é reconhecido nas próximas notas.';
+    c.appendChild(note);
+    const meses=[...new Set(notas.map(n=>String(n.data_emissao||'').slice(0,7)).filter(Boolean))].sort().reverse();
+    if((!_enComp||meses.indexOf(_enComp)<0)&&meses.length)_enComp=meses[0];
+    const sel=el('select','fi',null,{style:'max-width:220px;margin-bottom:12px'});
+    meses.forEach(m=>{const o=el('option',null,_enMesLbl(m),{value:m});if(m===_enComp)o.selected=true;sel.appendChild(o);});
+    sel.onchange=e=>{_enComp=e.target.value;renderPage();};
+    c.appendChild(el('div',null,[el('div','lbl',['Competência']),sel]));
+    const list=notas.filter(n=>String(n.data_emissao||'').slice(0,7)===_enComp);
+    const pend=list.filter(n=>!lanSet.has(n.chave)).length;
+    c.appendChild(el('div',null,null,{html:pend+' nota'+(pend!==1?'s':'')+' a lançar · '+list.length+' no mês',style:'font-size:12px;font-weight:800;color:var(--v);margin:2px 0 10px;text-transform:uppercase;letter-spacing:.5px'}));
+    if(!list.length){c.appendChild(div('tss',null,{style:'padding:16px',html:'Sem notas nessa competência.'}));return;}
+    list.forEach(n=>{
+      const done=lanSet.has(n.chave);const nit=Array.isArray(n.itens)?n.itens.length:0;
+      const card=div(null);card.style.cssText='background:#fff;border:1.5px solid var(--rb);border-radius:14px;padding:13px 15px;margin-bottom:9px'+(done?';opacity:.72':'');
+      card.innerHTML='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b style="font-size:14px;color:var(--tx);flex:1;min-width:0">'+_envEsc(n.emitente||('Nota '+(n.numero||'')))+'</b>'+(done?'<span style="background:#dcfce7;color:#166534;font-size:11px;font-weight:700;padding:3px 9px;border-radius:50px">lançada</span>':'<span style="background:#FBF0DD;color:#9A6B1E;font-size:11px;font-weight:700;padding:3px 9px;border-radius:50px">a lançar</span>')+'</div><div style="font-size:11.5px;color:var(--ts);margin-top:3px">'+DBR(n.data_emissao)+' · '+nit+' itens · '+R(n.valor_total)+'</div>';
+      const b=btn('btn '+(done?'bo':'bp')+' bsm',done?'Ver / relançar':'Lançar itens',()=>abrirNotaEN(n));
+      b.style.cssText='margin-top:10px;font-size:12px;font-weight:700';card.appendChild(b);c.appendChild(card);
+    });
+  }catch(e){c.innerHTML='<div style="padding:20px;color:red;font-weight:700">❌ Erro ao carregar.<br><small>'+_envEsc(e.message)+'</small></div>';}
+}
+function abrirNotaEN(n){
+  const itens=Array.isArray(n.itens)?n.itens:[];
+  const wrap=div(null);const rows=[];
+  const dl=el('datalist',null,null,{id:'enInsList'});
+  EN.insumos.forEach(i=>dl.appendChild(el('option',null,null,{value:i.nome})));
+  wrap.appendChild(dl);
+  if(!itens.length)wrap.appendChild(div('tss',['Essa nota não tem itens.']));
+  itens.forEach(it=>{
+    const desc=it.desc||'';const q=+it.qtd||0;const un=String(it.un||'').toUpperCase();const ct=+it.vtotal||0;
+    const mp=EN.mapByKey[_jnorm(desc)];let insNome='',fator=1;
+    if(mp&&EN.insById[mp.insumo_id]){insNome=EN.insById[mp.insumo_id].nome;fator=+mp.fator||1;}
+    const rw=div(null);rw.style.cssText='border:1px solid var(--rb);border-radius:12px;padding:10px 12px;margin-bottom:8px;background:var(--rf)';
+    rw.innerHTML='<div style="font-weight:700;font-size:13px;color:var(--tx)">'+_envEsc(desc)+'</div><div style="font-size:11px;color:var(--ts);margin-bottom:6px">nota: '+_enQ(q)+' '+_envEsc(un)+' · '+R(ct)+'</div>';
+    const insInp=el('input','fi',null,{list:'enInsList',placeholder:'Insumo (busque ou crie novo)',value:insNome,autocomplete:'off'});insInp.style.cssText='width:100%;margin-bottom:6px;font-size:13px';
+    const fatInp=el('input','fi',null,{type:'number',step:'0.0001',value:fator,inputmode:'decimal'});fatInp.style.cssText='width:88px;text-align:center';
+    const calc=el('span','tss');
+    const novoBox=div(null);novoBox.style.cssText='display:none;gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center';
+    const catSel=el('select','fi',null,{style:'flex:1;min-width:130px;font-size:12px'});EN_CATS.forEach(cc=>catSel.appendChild(el('option',null,cc,{value:cc})));
+    const unInp=el('input','fi',null,{placeholder:'un. uso',value:(un==='KG'?'kg':un==='UN'?'un':(un.toLowerCase()||'un'))});unInp.style.cssText='width:110px;font-size:12px';
+    novoBox.appendChild(el('span','tss',['🆕 novo:']));novoBox.appendChild(catSel);novoBox.appendChild(unInp);
+    function upd(){
+      const m=EN.insByName[_jnorm(insInp.value)];const isNew=insInp.value.trim()&&!m;
+      novoBox.style.display=isNew?'flex':'none';
+      const f=+fatInp.value||0,qu=q*f;const unUso=m?(m.unidade_custo||un):(unInp.value||un);
+      calc.innerHTML=qu>0?('→ entra <b style="color:var(--v)">'+_enQ(qu)+' '+_envEsc(unUso)+'</b> · '+R(ct/qu)+'/'+_envEsc(unUso)):'—';
+    }
+    insInp.oninput=upd;fatInp.oninput=upd;
+    const fl=div(null);fl.style.cssText='display:flex;align-items:center;gap:8px;flex-wrap:wrap';
+    fl.appendChild(el('span','tss',['Fator']));fl.appendChild(fatInp);fl.appendChild(calc);
+    rw.appendChild(insInp);rw.appendChild(fl);rw.appendChild(novoBox);wrap.appendChild(rw);
+    rows.push({desc,q,un,ct,insInp,fatInp,catSel,unInp});setTimeout(upd,0);
+  });
+  const bSave=btn('btn bp','✓ Lançar entrada da nota',()=>lancarNotaEN(n,rows,bSave));
+  bSave.style.cssText='width:100%;margin-top:4px;padding:13px;font-weight:800;font-size:14px';
+  wrap.appendChild(bSave);
+  mkModal('Lançar: '+_envEsc(n.emitente||('Nota '+(n.numero||''))),[wrap],null,'mo moxl');
+}
+async function lancarNotaEN(n,rows,bSave){
+  for(const r of rows){ if(!r.insInp.value.trim()){alert('Falta o insumo de: '+r.desc);r.insInp.focus();return;} if(!(+r.fatInp.value>0)){alert('Fator inválido em: '+r.desc);return;} }
+  if(!confirm('Lançar '+rows.length+' itens no estoque do CCMQ?\n\nDá entrada, converte pela unidade e atualiza o preço dos insumos.'))return;
+  bSave.textContent='Lançando...';bSave.disabled=true;
+  const H={'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'};
+  try{
+    const hoje=TD(),quem=ME||null;
+    await db('lola_ccmq_estoque_mov','DELETE',null,'?origem_tipo=eq.nota&origem_ref=eq.'+encodeURIComponent(n.chave));
+    for(const r of rows){
+      let ins=EN.insByName[_jnorm(r.insInp.value)];
+      if(!ins){
+        const novo=await db('lola_insumos','POST',{nome:r.insInp.value.trim(),categoria:r.catSel.value,unidade_compra:r.un||null,unidade_custo:(r.unInp.value||r.un||'un'),custo_por_unidade:0,destinos:['ccmq'],ativo:true});
+        ins=Array.isArray(novo)?novo[0]:novo;EN.insByName[_jnorm(ins.nome)]=ins;EN.insById[ins.id]=ins;
+      }
+      const f=+r.fatInp.value||1,qu=r.q*f,cu=qu>0?r.ct/qu:0,unUso=ins.unidade_custo||r.unInp.value||r.un||'un';
+      await db('lola_ccmq_estoque_mov','POST',{insumo_id:ins.id,tipo:'entrada',qtd:qu,unidade:unUso,custo_unit:cu,custo_total:r.ct,origem_tipo:'nota',origem_ref:n.chave,data:hoje,criado_por:quem});
+      await fetch(SB+'/rest/v1/lola_ccmq_estoque_map?on_conflict=desc_norm',{method:'POST',headers:H,body:JSON.stringify({desc_norm:_jnorm(r.desc),insumo_id:ins.id,fator:f})});
+      if(cu>0)await db('lola_insumos','PATCH',{custo_por_unidade:cu},'?id=eq.'+ins.id);
+    }
+    await fetch(SB+'/rest/v1/lola_ccmq_estoque_nota?on_conflict=chave',{method:'POST',headers:H,body:JSON.stringify({chave:n.chave})});
+    document.querySelectorAll('.ov').forEach(o=>o.remove());
+    renderPage();
+  }catch(e){alert('Erro ao lançar: '+e.message);bSave.textContent='✓ Lançar entrada da nota';bSave.disabled=false;}
 }
 async function pgPed(c){
   c.appendChild(ld());
