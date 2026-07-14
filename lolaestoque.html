@@ -188,16 +188,10 @@ td .sub{font-size:10px;color:var(--ts);margin-top:2px;}
 .mb3{margin-bottom:12px;} .mb4{margin-bottom:16px;}
 .bold{font-weight:700;} .tv{color:var(--v);} .tvd{color:var(--vd);} .tss{color:var(--ts);font-size:12px;}
 .dv{border:none;border-top:1px solid var(--rf);margin:14px 0;}
-.ir{background:#fff;border:1px solid var(--rb);border-radius:11px;padding:9px 10px;margin-bottom:7px;}
-.ir-head{display:flex;align-items:center;gap:7px;margin-bottom:7px;}
-.ir-head>select{flex:1!important;min-width:0!important;width:auto!important;}
-.ir-head>.bd{width:28px!important;height:28px!important;min-width:28px;padding:0!important;border-radius:50%!important;flex-shrink:0;font-size:12px;display:flex;align-items:center;justify-content:center;}
-.ir-grid{display:grid;grid-template-columns:1fr 1fr 0.6fr 0.95fr;gap:7px;margin-bottom:0;align-items:end;}
-.ir-f{display:flex;flex-direction:column;gap:2px;min-width:0;}
-.ir-f>input,.ir-f>select{width:100%!important;min-width:0!important;flex:none!important;text-align:center;padding:6px 4px!important;}
-.ir-lb{font-size:9.5px;font-weight:800;letter-spacing:.4px;color:#B79A8E;text-transform:uppercase;}
-.ir-fc{align-items:flex-end;text-align:right;}
-.ir-fc>*:last-child{font-size:15px!important;font-weight:800;color:var(--v)!important;min-width:0!important;text-align:right!important;white-space:nowrap;}
+.ir{display:flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--rb);border-radius:11px;padding:7px 9px;margin-bottom:6px;flex-wrap:nowrap;}
+.ir>.bq{flex-shrink:0;font-size:10px;padding:2px 7px;border-radius:50px;font-weight:700;white-space:nowrap;}
+.ir>.bd{width:28px!important;height:28px!important;min-width:28px;padding:0!important;border-radius:50%!important;flex-shrink:0;font-size:12px;display:flex;align-items:center;justify-content:center;}
+@media(max-width:520px){.ir{flex-wrap:wrap}.ir>select.fi:first-of-type{flex:1 1 100%}}
 .abar{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;}
 .eok{color:var(--vd);font-weight:700;} .ebx{color:var(--am);font-weight:700;} .ecr{color:#dc2626;font-weight:700;}
 .custo-box{background:var(--rf);border:1.5px solid var(--rb);border-radius:10px;padding:12px 16px;margin-top:12px;}
@@ -308,6 +302,14 @@ const SBS={rascunho:'bct',em_producao:'bprod',pronto_entrega:'bpronto',recebido_
 let PAGE='dashboard';
 let ME='';
 let _ins=[],_pp=[],_ft=[],_cat=[];
+/* unidades do seletor de ingrediente — SEMPRE todas (g/kg/ml/L/un...) + a atual, pra não travar em un/cx e errar o custo */
+function _ingUnits(ig){
+  const base=['g','kg','ml','L','un','cx','pct','maço','porção'];
+  let list=base.slice();
+  if(ig&&ig.tipo==='prep'){ const pp=_pp.find(p=>p.id===ig.id); const unPP=pp&&pp.rendimento_un?pp.rendimento_un:(ig.unidade||'g'); list=[unPP,...base]; }
+  if(ig&&ig.unidade&&!list.includes(ig.unidade)) list.unshift(ig.unidade);
+  return [...new Set(list)];
+}
 
 /* ── DOM helpers ── */
 function el(tag,cls,ch,at){
@@ -1410,19 +1412,8 @@ async function modalPrep(item){
         if(o.v===curVal)opt.selected=true;
         sel.appendChild(opt);
       });
-      const unOpts2=(()=>{
-        // Para sub-pré-produções, incluir a unidade de rendimento delas
-        if(ig.tipo==='prep'){
-          const pp=_pp.find(p=>p.id===ig.id);
-          const unPP=pp?.rendimento_un||ig.unidade||'g';
-          const base=['g','ml','kg','L','un','porção'];
-          return [unPP,...base.filter(u=>u!==unPP)];
-        }
-        if(['g','ml'].includes(ig.unidade)) return ['g','ml','kg','L'];
-        if(['kg','L'].includes(ig.unidade)) return ['kg','L','g','ml'];
-        return ['un','cx','pct','maço'];
-      })();
-      const unSel2=el('select','fi',null,{style:'width:58px;flex-shrink:0;padding:6px 4px;font-size:12px'});
+      const unOpts2=_ingUnits(ig);
+      const unSel2=el('select','fi',null,{style:'width:74px;flex-shrink:0;padding:6px 2px;font-size:12px'});
       unOpts2.forEach(u=>{const o=el('option',null,u,{value:u});if(u===ig.unidade)o.selected=true;unSel2.appendChild(o);});
       unSel2.addEventListener('change',e=>{ig.unidade=e.target.value;calcItem(idx);});
 
@@ -1436,17 +1427,17 @@ async function modalPrep(item){
         tipoBadge.className='bq '+(ig.tipo==='prep'?'bce':'bc');
         tipoBadge.style.cssText='font-size:10px;padding:2px 8px;border-radius:50px;font-weight:700;white-space:nowrap;flex-shrink:0';
         unSel2.innerHTML='';
-        const newU=(['g','ml'].includes(ig.unidade)?['g','ml','kg','L']:['kg','L'].includes(ig.unidade)?['kg','L']:['un','cx','pct']);
-        newU.forEach(u=>{const o=el('option',null,u,{value:u});if(u===ig.unidade)o.selected=true;unSel2.appendChild(o);});
+        _ingUnits(ig).forEach(u=>{const o=el('option',null,u,{value:u});if(u===ig.unidade)o.selected=true;unSel2.appendChild(o);});
         calcItem(idx);
       });
 
       const qbI=finp('',ig.qtd_bruta!=null&&ig.qtd_bruta!==''?String(ig.qtd_bruta).replace('.',','):'',v=>{ig.qtd_bruta=(v||'').replace(',','.');calcItem(idx);},'text');qbI.setAttribute('inputmode','decimal');
-      qbI.style.cssText='width:80px;flex-shrink:0';qbI.placeholder='Qtd';
+      qbI.style.cssText='width:62px;flex-shrink:0;text-align:center;padding:6px 4px';qbI.placeholder='Qtd';
       const fcI=finp('',ig.fc!=null?String(ig.fc).replace('.',','):1,v=>{ig.fc=(v||'').replace(',','.');calcItem(idx);},'text');fcI.setAttribute('inputmode','decimal');
-      fcI.style.cssText='width:72px;flex-shrink:0;text-align:center';
+      fcI.style.cssText='width:54px;flex-shrink:0;text-align:center;padding:6px 4px';fcI.placeholder='FC';fcI.title='Fator de correção';
+      sel.style.cssText='flex:1 1 120px;min-width:100px';
       const ctEl=span('bold tv',R(ig.custo_total||0));
-      ctEl.style.cssText='white-space:nowrap;text-align:right;';
+      ctEl.style.cssText='white-space:nowrap;text-align:right;font-weight:800;color:var(--v);min-width:64px;flex-shrink:0;font-size:14px';
 
       function calcItem(i){
         const src=ings[i];
@@ -1466,15 +1457,7 @@ async function modalPrep(item){
       }
 
       const rm=btn('btn bd bxs','✕',()=>{ings.splice(idx,1);rebuildI();calcTotais();});
-      iw.appendChild(div('ir',[
-        div('ir-head',[tipoBadge,sel,rm]),
-        div('ir-grid',[
-          div('ir-f',[span('ir-lb','Qtd'),qbI]),
-          div('ir-f',[span('ir-lb','Un'),unSel2]),
-          div('ir-f',[span('ir-lb','FC'),fcI]),
-          div('ir-f ir-fc',[span('ir-lb','Custo'),ctEl]),
-        ]),
-      ]));
+      iw.appendChild(div('ir',[tipoBadge,sel,qbI,unSel2,fcI,ctEl,rm]));
     });
   }
   rebuildI();
@@ -2020,42 +2003,26 @@ async function modalFicha(item){
         unEl.textContent=ig.unidade||'g';
       });
 
-      // Unidade selecionável — baseada na unidade do insumo/prep
-      const unOpts=(()=>{
-        // Para pré-produções, incluir a unidade de rendimento delas
-        if(ig.tipo==='prep'){
-          const pp=_pp.find(p=>p.id===ig.id);
-          const unPP=pp?.rendimento_un||ig.unidade||'g';
-          // Montar lista com unidade da PP no topo
-          const base=['g','ml','kg','L','un','porção'];
-          const lista=[unPP,...base.filter(u=>u!==unPP)];
-          return lista;
-        }
-        if(['g','ml'].includes(ig.unidade)) return ['g','ml','kg','L'];
-        if(['kg','L'].includes(ig.unidade)) return ['kg','L','g','ml'];
-        return ['un','cx','pct','maço'];
-      })();
-      const unSel=el('select','fi',null,{style:'width:58px;flex-shrink:0;padding:6px 4px;font-size:12px'});
-      unOpts.forEach(u=>{const o=el('option',null,u,{value:u});if(u===ig.unidade)o.selected=true;unSel.appendChild(o);});
+      // Unidade selecionável — SEMPRE todas (g/kg/ml/L/un...) + a atual
+      const unSel=el('select','fi',null,{style:'width:74px;flex-shrink:0;padding:6px 2px;font-size:12px'});
+      _ingUnits(ig).forEach(u=>{const o=el('option',null,u,{value:u});if(u===ig.unidade)o.selected=true;unSel.appendChild(o);});
       unSel.addEventListener('change',e=>{ig.unidade=e.target.value;calcItem(idx);});
 
       const qbI=finp('',ig.qtd_bruta!=null&&ig.qtd_bruta!==''?String(ig.qtd_bruta).replace('.',','):'',v=>{ig.qtd_bruta=(v||'').replace(',','.');calcItem(idx);},'text');qbI.setAttribute('inputmode','decimal');
-      qbI.style.cssText='width:80px;flex-shrink:0';
+      qbI.style.cssText='width:62px;flex-shrink:0;text-align:center;padding:6px 4px';
       qbI.placeholder='Qtd';
 
       const fcI=finp('',ig.fc!=null?String(ig.fc).replace('.',','):1,v=>{ig.fc=(v||'').replace(',','.');calcItem(idx);},'text');fcI.setAttribute('inputmode','decimal');
-      fcI.style.cssText='width:72px;flex-shrink:0;text-align:center';
+      fcI.style.cssText='width:54px;flex-shrink:0;text-align:center;padding:6px 4px';fcI.placeholder='FC';fcI.title='Fator de correção';
+      sel.style.cssText='flex:1 1 120px;min-width:100px';
 
       const ctEl=span('bold tv',R(ig.custo_total||0));
-      ctEl.style.cssText='white-space:nowrap;text-align:right;';
+      ctEl.style.cssText='white-space:nowrap;text-align:right;font-weight:800;color:var(--v);min-width:64px;flex-shrink:0;font-size:14px';
 
       // Atualizar também o unSel quando seleciona um ingrediente
       sel.addEventListener('change',()=>{
-        // Resetar opções de unidade
         unSel.innerHTML='';
-        const newOpts=(['g','ml'].includes(ig.unidade)?['g','ml','kg','L']:
-                        ['kg','L'].includes(ig.unidade)?['kg','L','g','ml']:['un','cx','pct','maço']);
-        newOpts.forEach(u=>{const o=el('option',null,u,{value:u});if(u===ig.unidade)o.selected=true;unSel.appendChild(o);});
+        _ingUnits(ig).forEach(u=>{const o=el('option',null,u,{value:u});if(u===ig.unidade)o.selected=true;unSel.appendChild(o);});
       });
 
       function calcItem(i){
@@ -2073,15 +2040,7 @@ async function modalFicha(item){
       }
 
       const rm=btn('btn bd bxs','✕',()=>{ings.splice(idx,1);rebuildI();calcTotais();});
-      iw.appendChild(div('ir',[
-        div('ir-head',[tipoBadge,sel,rm]),
-        div('ir-grid',[
-          div('ir-f',[span('ir-lb','Qtd'),qbI]),
-          div('ir-f',[span('ir-lb','Un'),unSel]),
-          div('ir-f',[span('ir-lb','FC'),fcI]),
-          div('ir-f ir-fc',[span('ir-lb','Custo'),ctEl]),
-        ]),
-      ]));
+      iw.appendChild(div('ir',[tipoBadge,sel,qbI,unSel,fcI,ctEl,rm]));
     });
   }
   rebuildI();calcTotais();
@@ -4763,7 +4722,7 @@ async function modalNovoPedido(){
   mb.appendChild(el('hr','dv'));
 
   // Campo de busca
-  const buscaInp=el('input','fi',null,{placeholder:'🔍 Buscar item...',autocomplete:'off'});
+  const buscaInp=el('input','fi',null,{placeholder:'🔍 Buscar item ou insumo avulso (ex.: queijo, salame, banana)…',autocomplete:'off'});
   buscaInp.style.cssText='width:100%;margin-bottom:8px';
   buscaInp.addEventListener('input',e=>{_buscaNovoPed=e.target.value.toLowerCase();buildItens();});
   mb.appendChild(buscaInp);
@@ -4781,13 +4740,17 @@ async function modalNovoPedido(){
     const ppDest=_pp.filter(x=>(x.e_preparo||(x.destinos||[]).includes('central'))&&
       (!_buscaNovoPed||x.nome.toLowerCase().includes(_buscaNovoPed)));
     const ftDest=ftPre.filter(x=>(!_buscaNovoPed||x.nome.toLowerCase().includes(_buscaNovoPed)));
-    const insDest=_ins.filter(x=>((x.destinos||[]).includes(_destPed)||(x.destinos||[]).includes('central'))&&
-      (!_buscaNovoPed||x.nome.toLowerCase().includes(_buscaNovoPed)));
+    // Sem busca: só os insumos marcados p/ a unidade/central. Com busca: QUALQUER insumo do catálogo
+    // (pra incluir avulsos tipo queijo fatiado, salame, banana, com quantidade).
+    const insDest=_ins.filter(x=>{
+      if(_buscaNovoPed) return x.nome.toLowerCase().includes(_buscaNovoPed);
+      return (x.destinos||[]).includes(_destPed)||(x.destinos||[]).includes('central');
+    });
 
     const conteudo=div(null);
 
     if(!ppDest.length&&!insDest.length&&!ftDest.length){
-      conteudo.appendChild(div('tss mt3 mb3','Nenhum item categorizado para '+DEST_LBL[_destPed]+' ainda. Use o botão 🏷️ nas pré-produções e insumos para categorizar.'));
+      conteudo.appendChild(div('tss mt3 mb3','Nenhum item fixo para '+DEST_LBL[_destPed]+'. Dica: digite na busca acima o nome de qualquer insumo (ex.: queijo fatiado, salame, banana) para incluí-lo com quantidade.'));
       itensArea.appendChild(conteudo);
       return;
     }
