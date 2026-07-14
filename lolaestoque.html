@@ -226,6 +226,11 @@ td .sub{font-size:10px;color:var(--ts);margin-top:2px;}
   .abar{flex-wrap:wrap;gap:8px}
   .tabs{flex-wrap:wrap;gap:4px}
   .tp{font-size:11px;padding:0 10px;height:28px}
+  .pedbar{flex-direction:column;align-items:stretch!important;gap:10px}
+  .pedbar .pedtabs{width:100%}
+  .pedbar .tabs{width:100%;margin-bottom:0}
+  .pedbar .pedbtns{width:100%}
+  .pedbar .pedbtns>button{flex:1 1 0;min-width:0;justify-content:center;min-height:44px;padding:0 12px!important}
   .tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
   table{min-width:500px}
   .mo{width:95vw!important;max-width:95vw!important;margin:10px auto}
@@ -4439,14 +4444,14 @@ async function pgPed(c){
     }
 
     // Montar barra manualmente para evitar null nodes
-    const barraTopo=div('fl_ jb aic');
-    const tabsGrupo=div('fl_ gap2 aic');
+    const barraTopo=div('fl_ jb aic pedbar');
+    const tabsGrupo=div('fl_ gap2 aic pedtabs');
     const tabsEl=div('tabs');
     [{k:'todos',l:'Todos'},{k:'rascunho',l:'Rascunhos'},{k:'ccmq',l:'CCMQ'},{k:'mac',l:'Mac'},{k:'terceiro',l:'Terceiros'},{k:'em_producao',l:'Em produção'},{k:'pronto_entrega',l:'Pronto p/ entrega'}]
       .forEach(t=>{const p=span('tp'+(_pedTab===t.k?' active':''),t.l);p.addEventListener('click',()=>{_pedTab=t.k;drawPed($('#ped-t'));});tabsEl.appendChild(p);});
     tabsGrupo.appendChild(tabsEl);
     barraTopo.appendChild(tabsGrupo);
-    const btnsDir=div('fl_ gap2');
+    const btnsDir=div('fl_ gap2 pedbtns');
     const bAtualizar=el('button','btn bo bsm',null,{html:'<i class="ph-duotone ph-arrows-clockwise"></i> Atualizar',onclick:recarregarPedidos});
     bAtualizar.id='btn-refresh-ped';
     btnsDir.appendChild(bAtualizar);
