@@ -94,6 +94,17 @@ body{font-family:'Hanken Grotesk',sans-serif;background:var(--rf);color:var(--tx
 .ped-ab.recv{background:#E6F3EA;border-color:#C9E6D4;color:#2C7A4B;}
 .ped-ab.send{background:var(--v);border-color:var(--v);color:#fff;}
 .ped-ab.warn{background:#FBF0DD;border-color:#F1DFB8;color:#9A6B1E;}
+@media(min-width:769px){
+  .ped-card{display:flex;align-items:center;gap:14px;flex-wrap:nowrap;padding:10px 16px;}
+  .ped-card>.ped-top{display:contents;}
+  .ped-numwrap{order:1;flex-shrink:0;}
+  .ped-meta{order:2;margin:0;white-space:nowrap;flex-shrink:0;}
+  .ped-status{order:3;margin:0;flex-shrink:0;}
+  .ped-status select{padding:6px 10px;font-size:12px;}
+  .ped-val{order:4;margin:0 0 0 auto;flex-shrink:0;font-size:16px;}
+  .ped-btns{order:5;margin:0;flex-wrap:nowrap;flex-shrink:0;}
+  .ped-ab{height:32px;padding:0 12px;}
+}
 @media(max-width:768px){
   .ped-btns{flex-wrap:nowrap;gap:5px;justify-content:stretch;}
   .ped-ab{flex:1 1 0;min-width:0;padding:0;font-size:11px;overflow:hidden;}
