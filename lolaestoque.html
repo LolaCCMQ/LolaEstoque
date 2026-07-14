@@ -66,6 +66,31 @@ body{font-family:'Hanken Grotesk',sans-serif;background:var(--rf);color:var(--tx
 .ins-ab{flex:0 0 auto;width:46px;height:36px;background:#F7F1EA;border:1px solid var(--rb);border-radius:11px;color:var(--v);font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
 .ins-ab.del{background:#FBEAE7;border-color:#F3D3CE;color:#B5302E;}
 .ins-ab.warn{background:#FBF0DD;border-color:#F1DFB8;color:#9A6B1E;}
+/* INSUMO PLANILHA (v4) */
+.ins-sech{display:flex;align-items:center;gap:8px;margin:16px 0 6px;}
+.ins-sech .sq{width:10px;height:10px;border-radius:3px;flex-shrink:0;}
+.ins-sech .nm{font-family:'Fraunces',serif;font-size:14px;font-weight:600;}
+.ins-sech .ct{font-size:11px;color:#A08B7F;}
+.ins-tbl{background:#fff;border:1px solid var(--rb);border-radius:12px;overflow:hidden;box-shadow:0 1px 2px rgba(42,26,23,.05);}
+.ins-hd,.ins-row{display:grid;grid-template-columns:minmax(0,1fr) 150px 96px 132px;align-items:center;gap:8px;padding:9px 14px;}
+.ins-hd{background:#FAF4EC;border-bottom:1px solid var(--rb);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#A08B7F;font-weight:700;}
+.ins-row{border-top:1px solid #F3EBE2;}
+.ins-row:first-child{border-top:0;}
+.ins-row:hover{background:#FCF8F2;}
+.ins-rnome{font-size:14px;font-weight:700;color:var(--tx);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ins-run{font-size:11px;color:#A08B7F;font-weight:500;}
+.ins-rupd{font-size:11px;color:#7C6A60;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ins-rupd b{color:#5F4E46;font-weight:700;}
+.ins-rupd.none{color:#B79A8E;}
+.ins-rcusto{text-align:right;font-family:'Fraunces',serif;font-size:16px;font-weight:600;color:var(--v);white-space:nowrap;}
+.ins-racts{display:flex;gap:5px;justify-content:flex-end;}
+.ins-sb{width:28px;height:28px;border-radius:8px;background:#F7F1EA;border:1px solid var(--rb);color:var(--v);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.ins-sb.del{background:#FBEAE7;border-color:#F3D3CE;color:#B5302E;}
+@media(max-width:640px){
+  .ins-hd,.ins-row{grid-template-columns:minmax(0,1fr) auto auto;}
+  .ins-hd-upd,.ins-rupd{display:none;}
+  .ins-sb{width:32px;height:32px;font-size:15px;}
+}
 /* CONTAGEM item card (v2) */
 .cont-card{background:#fff;border:1px solid var(--rb);border-radius:16px;padding:12px 14px;margin-bottom:9px;box-shadow:0 1px 2px rgba(42,26,23,.05);}
 .cont-top{display:flex;align-items:center;justify-content:space-between;gap:8px;}
@@ -665,6 +690,8 @@ async function pgIns(c){
     c.innerHTML='';
     // filtros de categoria
     const CATS_ORDER=['Bebidas Alcoólicas','Bebidas Não Alcoólicas','Cervejas','Vinhos','Carnes e Pescados','Hortifruti','Insumos Alimentos','Limpeza','Pães'];
+    const CAT_COR={'Bebidas Alcoólicas':'#534AB7','Bebidas Não Alcoólicas':'#185FA5','Cervejas':'#9A6B1E','Vinhos':'#993556','Carnes e Pescados':'#A32D2D','Hortifruti':'#3B6D11','Insumos Alimentos':'#854F0B','Limpeza':'#0F6E56','Pães':'#993C1D'};
+    function mkSecH(cat,n){const cor=CAT_COR[cat]||'#A82A2A';const sh=div('ins-sech');sh.innerHTML='<span class="sq" style="background:'+cor+'"></span><span class="nm" style="color:'+cor+'">'+cat+'</span><span class="ct">'+n+' '+(n===1?'item':'itens')+'</span>';return sh;}
     const cats=CATS_ORDER.filter(c=>_ins.some(i=>i.categoria===c));
     let filtCat='Todos';let filtBusca='';
     const tabW=div('tabs');
@@ -699,10 +726,11 @@ async function pgIns(c){
       if(filtCat==='Todos'){
         const grupos={};f.forEach(i=>{if(!grupos[i.categoria])grupos[i.categoria]=[];grupos[i.categoria].push(i);});
         Object.entries(grupos).forEach(([cat,itens])=>{
-          w.appendChild(div('mt3 mb3',el('span','bct bold',cat,{style:'font-size:11px;letter-spacing:1px;'})));
+          w.appendChild(mkSecH(cat,itens.length));
           w.appendChild(mkInsTable(itens));
         });
       }else{
+        w.appendChild(mkSecH(filtCat,f.length));
         w.appendChild(mkInsTable(f));
       }
     }
@@ -712,49 +740,46 @@ async function pgIns(c){
 }
 
 function mkInsTable(itens){
-  const wrap=document.createElement('div');
+  const tbl=div('ins-tbl');
+  const hd=div('ins-hd');
+  hd.innerHTML='<div>Insumo</div><div class="ins-hd-upd">\u00DAltima atualiza\u00E7\u00E3o</div><div style="text-align:right">Custo</div><div style="text-align:right">A\u00E7\u00F5es</div>';
+  tbl.appendChild(hd);
   itens.forEach(i=>{
     const unCusto=i.unidade_custo||'kg';
-    const card=div('ins-card');
-    // topo: info + custo
-    const top=div('ins-top');
-    const info=div('ins-info');
-    info.appendChild(div('ins-nome',[i.nome]));
-    const meta=div('ins-meta');
-    meta.appendChild(bq(i.categoria.split(' ')[0],'bct'));
-    meta.appendChild(span('ins-un','por '+unCusto));
-    info.appendChild(meta);
-    top.appendChild(info);
-    const vcusto=div('ins-custo');
-    vcusto.innerHTML='<div class="ins-custo-lb">Custo/'+unCusto+'</div><div class="ins-custo-v">'+R(i.custo_por_unidade)+'</div>';
-    top.appendChild(vcusto);
-    card.appendChild(top);
-    // linha "pre\u00E7o atualizado em / por"
-    const upd=div('ins-upd');
-    const ic=document.createElement('i');ic.className='ph-duotone ph-clock-counter-clockwise';upd.appendChild(ic);
+    const row=div('ins-row');
+    // nome + unidade
+    const nome=div('ins-rnome');
+    nome.appendChild(document.createTextNode(i.nome));
+    nome.appendChild(span('ins-run','  \u00B7 por '+unCusto));
+    row.appendChild(nome);
+    // \u00FAltima atualiza\u00E7\u00E3o
+    const upd=div('ins-rupd');
     if(i.preco_atualizado_em){
       const d=new Date(i.preco_atualizado_em).toLocaleDateString('pt-BR',{day:'2-digit',month:'short'});
-      upd.appendChild(document.createTextNode(' Pre\u00E7o atualizado '+d));
-      if(i.preco_atualizado_por){upd.appendChild(document.createTextNode(' por '));const b=document.createElement('b');b.textContent=i.preco_atualizado_por;upd.appendChild(b);}
+      upd.appendChild(document.createTextNode(d));
+      if(i.preco_atualizado_por){upd.appendChild(document.createTextNode(' \u00B7 '));const b=document.createElement('b');b.textContent=i.preco_atualizado_por;upd.appendChild(b);}
     }else{
-      upd.classList.add('ins-upd-none');
-      upd.appendChild(document.createTextNode(' Sem atualiza\u00E7\u00E3o de pre\u00E7o registrada'));
+      upd.classList.add('none');
+      upd.appendChild(document.createTextNode('Sem registro'));
     }
-    card.appendChild(upd);
-    // bot\u00F5es (Phosphor)
-    const btns=div('ins-btns');
-    btns.appendChild(el('button','ins-ab',null,{html:'<i class="ph-duotone ph-magnifying-glass"></i>',title:'Onde \u00E9 usado',onclick:()=>ondeEUsado(i)}));
-    btns.appendChild(el('button','ins-ab',null,{html:'<i class="ph-duotone ph-chart-line"></i>',title:'Hist\u00F3rico de pre\u00E7o',onclick:()=>modalHistoricoPreco(i)}));
-    btns.appendChild(el('button','ins-ab',null,{html:'<i class="ph-duotone ph-pencil-simple"></i>',title:'Editar',onclick:()=>modalIns(i)}));
-    btns.appendChild(el('button','ins-ab del',null,{html:'<i class="ph-duotone ph-trash"></i>',title:'Excluir',onclick:async()=>{
+    row.appendChild(upd);
+    // custo
+    row.appendChild(div('ins-rcusto',[R(i.custo_por_unidade)]));
+    // a\u00E7\u00F5es (Phosphor)
+    const acts=div('ins-racts');
+    acts.appendChild(el('button','ins-sb',null,{html:'<i class="ph-duotone ph-magnifying-glass"></i>',title:'Onde \u00E9 usado',onclick:()=>ondeEUsado(i)}));
+    acts.appendChild(el('button','ins-sb',null,{html:'<i class="ph-duotone ph-chart-line"></i>',title:'Hist\u00F3rico de pre\u00E7o',onclick:()=>modalHistoricoPreco(i)}));
+    acts.appendChild(el('button','ins-sb',null,{html:'<i class="ph-duotone ph-pencil-simple"></i>',title:'Editar',onclick:()=>modalIns(i)}));
+    acts.appendChild(el('button','ins-sb del',null,{html:'<i class="ph-duotone ph-trash"></i>',title:'Excluir',onclick:async()=>{
       if(!confirm('Excluir "'+i.nome+'"?'))return;
       await db('lola_insumos','PATCH',{ativo:false},'?id=eq.'+i.id);
       _ins=_ins.filter(x=>x.id!==i.id);
       window._drawIns&&window._drawIns(document.getElementById('ins-t'));
     }}));
-    card.appendChild(btns);wrap.appendChild(card);
+    row.appendChild(acts);
+    tbl.appendChild(row);
   });
-  return wrap;
+  return tbl;
 }
 
 
