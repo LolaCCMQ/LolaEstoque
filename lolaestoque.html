@@ -97,7 +97,7 @@ body{font-family:'Hanken Grotesk',sans-serif;background:var(--rf);color:var(--tx
 .ins-caret{font-size:12px;color:#B79A8E;margin-left:5px;transition:transform .15s;display:inline-block;}
 .ins-row.open .ins-caret{transform:rotate(90deg);}
 /* ===== FICHAS TÉCNICAS — lista (v4) ===== */
-.ft-hd,.ft-row{display:grid;grid-template-columns:minmax(0,1fr) 92px 92px 104px 118px 132px;align-items:center;gap:8px;padding:9px 14px;}
+.ft-hd,.ft-row{display:grid;grid-template-columns:minmax(0,1fr) 92px 92px 62px 118px 132px;align-items:center;gap:10px;padding:9px 14px;}
 .ft-hd{background:#FAF4EC;border-bottom:1px solid var(--rb);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#A08B7F;font-weight:700;}
 .ft-row{border-top:1px solid #F3EBE2;}
 .ft-row:first-child{border-top:0;}
@@ -108,6 +108,7 @@ body{font-family:'Hanken Grotesk',sans-serif;background:var(--rf);color:var(--tx
 .ft-nome-t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
 .ft-sel{flex:0 0 auto;font-size:10px;font-weight:800;padding:1px 7px;border-radius:50px;color:#fff;}
 .ft-rev{flex:0 0 auto;display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:1px 7px;border-radius:50px;background:#FBF0DD;color:#9A6B1E;border:1px solid #F1DFB8;cursor:pointer;}
+.ft-cmvalto{flex:0 0 auto;display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:1px 7px;border-radius:50px;background:#FBEAE7;color:#B5302E;border:1px solid #F3D3CE;white-space:nowrap;}
 .ft-num{text-align:right;font-family:'Fraunces',serif;font-size:15px;font-weight:600;color:var(--v);white-space:nowrap;}
 .ft-num.pv{color:var(--tx);}
 .ft-num.vazio{font-family:'Hanken Grotesk',sans-serif;font-size:11px;font-weight:400;color:#B79A8E;}
@@ -1773,6 +1774,15 @@ const FT_SORTS=[
   {k:'editado',l:'Editado'}
 ];
 function _ftCmv(x){ return (!x.preco_venda||x.preco_venda<=0)?null:(x.custo_por_porcao/x.preco_venda*100); }
+/* CMV compacto da lista: só bolinha + %. O aviso "revisar ficha" vira etiqueta ao lado do nome. */
+function mkCMVCompacto(preco_venda,custo){
+  if(!preco_venda||preco_venda<=0) return span('ft-num vazio','—');
+  const cmv=custo/preco_venda*100, alto=cmv>30;
+  return div('fl_ aic gap2',[
+    el('span',null,null,{style:'width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0;background:'+(alto?'#B5302E':'#2C7A4B')}),
+    el('span','bold',cmv.toFixed(0)+'%',{style:'color:'+(alto?'#B5302E':'var(--vd)')})
+  ]);
+}
 function _ftOrdena(f){
   const s=_ftSort;
   if(s==='nome') return f.sort((a,b)=>(a.nome||'').localeCompare(b.nome||'','pt'));
@@ -1844,6 +1854,11 @@ function drawFT(w){
       rv.title=x.revisar_motivo||''; rv.addEventListener('click',()=>modalRevisarFicha('ft',x));
       nome.appendChild(rv);
     }
+    if(!semPreco&&cmv>30){
+      const rc=span('ft-cmvalto'); rc.innerHTML='<i class="ph-duotone ph-warning-circle"></i> revisar ficha';
+      rc.title='CMV de '+cmv.toFixed(0)+'% — acima dos 30%';
+      nome.appendChild(rc);
+    }
     row.appendChild(nome);
 
     // custo/porção
@@ -1852,8 +1867,8 @@ function drawFT(w){
     const pv=div('ft-num pv'+(semPreco?' vazio':'')); pv.classList.add('ft-pv');
     pv.textContent=semPreco?'sem preço':R(x.preco_venda);
     row.appendChild(pv);
-    // CMV
-    const cmvCel=div('ft-cmvcel'); cmvCel.appendChild(mkCMV(x.preco_venda,x.custo_por_porcao));
+    // CMV — só bolinha + %, sem texto pendurado
+    const cmvCel=div('ft-cmvcel'); cmvCel.appendChild(mkCMVCompacto(x.preco_venda,x.custo_por_porcao));
     row.appendChild(cmvCel);
     // editado
     row.appendChild(div('ft-ed',[dataEd?((x.editado_por||'—')+' · '+dataEd):'—']));
