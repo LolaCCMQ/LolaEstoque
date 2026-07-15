@@ -1582,10 +1582,17 @@ async function modalPrep(item){
   const custoResEl=div('custo-box');
   calcTotais();
 
-  // Campo de autoria
-  const _autorPP={v:item?.editado_por||''};
-  const nomeEdit=finp('',_autorPP.v,v=>{_autorPP.v=v;});
-  nomeEdit.placeholder='Seu nome...';
+  // Autoria: vem do LOGIN do portal (?u=). Só digitável se abrir o app fora do portal.
+  const _autorPP={v:ME||item?.editado_por||''};
+  let nomeEdit;
+  if(ME){
+    nomeEdit=div(null,null,{style:'display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--rt);border:1.5px solid var(--rb);border-radius:9px'});
+    nomeEdit.innerHTML='<b style="font-size:13px;color:var(--tx)">'+_uEsc(ME)+'</b>'
+      +'<span style="margin-left:auto;font-size:11px;color:#8A7A72"><i class="ph-duotone ph-lock-simple"></i> vem do seu login</span>';
+  }else{
+    nomeEdit=finp('',_autorPP.v,v=>{_autorPP.v=v;});
+    nomeEdit.placeholder='Seu nome...';
+  }
   // Seletor de destinos PP
   const DESTS_PP_OPT=[
     {k:'ccmq',label:'CCMQ',cor:'#AA2B2B'},
@@ -2254,7 +2261,7 @@ async function modalFicha(item){
   }
   rebuildI();calcTotais();
 
-  const _autorFt={v:item?.editado_por||''};
+  const _autorFt={v:ME||item?.editado_por||''};
   const nomeEditFt=finp('',_autorFt.v,v=>{_autorFt.v=v;});
   nomeEditFt.placeholder='Seu nome...';
   const descEd=el('input','fi',null,{type:'text',id:'ft-descricao-edicao',placeholder:ed?'Ex: ajustei gramatura do croissant de 80g para 110g':'Nova ficha'});
@@ -2312,6 +2319,14 @@ async function modalFicha(item){
     (()=>{
       const autorWrap=div('fl_ aic gap2');
       autorWrap.style.cssText='margin-top:4px;padding:10px 14px;background:var(--rt);border-radius:10px;border:1.5px solid var(--rb)';
+      // Quem edita vem do LOGIN do portal (?u=). Só vira campo digitável se abrir fora do portal.
+      if(ME){
+        _autorFt.v=ME;
+        autorWrap.innerHTML='<span style="white-space:nowrap;font-size:12px;font-weight:700;color:var(--v);flex-shrink:0">✍️ Alterando como:</span>'
+          +'<b style="font-size:13px;color:var(--tx)">'+_uEsc(ME)+'</b>'
+          +'<span class="tss" style="margin-left:auto;font-size:11px;color:#8A7A72"><i class="ph-duotone ph-lock-simple"></i> vem do seu login</span>';
+        return autorWrap;
+      }
       const lbl=el('span',null,'✍️ Quem está alterando:',{style:'white-space:nowrap;font-size:12px;font-weight:700;color:var(--v);flex-shrink:0'});
       const inpA=el('input','fi',null,{type:'text',placeholder:'Seu nome (obrigatório para salvar)','data-autor-ft':'',style:'flex:1;border:1.5px solid var(--rb)'});
       if(_autorFt.v)inpA.value=_autorFt.v;
