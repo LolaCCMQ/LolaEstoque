@@ -768,7 +768,7 @@ function mkInsTable(itens){
     // a\u00E7\u00F5es (Phosphor)
     const acts=div('ins-racts');
     acts.appendChild(el('button','ins-sb',null,{html:'<i class="ph-duotone ph-magnifying-glass"></i>',title:'Onde \u00E9 usado',onclick:()=>ondeEUsado(i)}));
-    acts.appendChild(el('button','ins-sb',null,{html:'<i class="ph-duotone ph-chart-line"></i>',title:'Hist\u00F3rico de pre\u00E7o',onclick:()=>modalHistoricoPreco(i)}));
+    acts.appendChild(el('button','ins-sb',null,{html:'<i class="ph-duotone ph-chart-line"></i>',title:'Hist\u00F3rico de pre\u00E7o',onclick:()=>verHistoricoPreco(i)}));
     acts.appendChild(el('button','ins-sb',null,{html:'<i class="ph-duotone ph-pencil-simple"></i>',title:'Editar',onclick:()=>modalIns(i)}));
     acts.appendChild(el('button','ins-sb del',null,{html:'<i class="ph-duotone ph-trash"></i>',title:'Excluir',onclick:async()=>{
       if(!confirm('Excluir "'+i.nome+'"?'))return;
