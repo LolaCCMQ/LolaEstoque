@@ -96,6 +96,32 @@ body{font-family:'Hanken Grotesk',sans-serif;background:var(--rf);color:var(--tx
 .ins-usos .uinfo{color:#8A7A72;}
 .ins-caret{font-size:12px;color:#B79A8E;margin-left:5px;transition:transform .15s;display:inline-block;}
 .ins-row.open .ins-caret{transform:rotate(90deg);}
+/* ===== FICHAS TÉCNICAS — lista (v4) ===== */
+.ft-hd,.ft-row{display:grid;grid-template-columns:minmax(0,1fr) 92px 92px 104px 118px 132px;align-items:center;gap:8px;padding:9px 14px;}
+.ft-hd{background:#FAF4EC;border-bottom:1px solid var(--rb);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#A08B7F;font-weight:700;}
+.ft-row{border-top:1px solid #F3EBE2;}
+.ft-row:first-child{border-top:0;}
+.ft-row:hover{background:#FCF8F2;}
+.ft-row.alerta{background:#FFF7F6;}
+.ft-row.alerta:hover{background:#FDEFED;}
+.ft-nome{font-size:14px;font-weight:700;color:var(--tx);min-width:0;display:flex;align-items:center;flex-wrap:wrap;gap:5px;}
+.ft-nome-t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
+.ft-sel{flex:0 0 auto;font-size:10px;font-weight:800;padding:1px 7px;border-radius:50px;color:#fff;}
+.ft-rev{flex:0 0 auto;display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:1px 7px;border-radius:50px;background:#FBF0DD;color:#9A6B1E;border:1px solid #F1DFB8;cursor:pointer;}
+.ft-num{text-align:right;font-family:'Fraunces',serif;font-size:15px;font-weight:600;color:var(--v);white-space:nowrap;}
+.ft-num.pv{color:var(--tx);}
+.ft-num.vazio{font-family:'Hanken Grotesk',sans-serif;font-size:11px;font-weight:400;color:#B79A8E;}
+.ft-ed{font-size:11px;color:#7C6A60;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ft-cmvcel{display:flex;justify-content:flex-end;}
+.ft-acts{display:flex;gap:5px;justify-content:flex-end;}
+.ft-sort{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0 0 10px;}
+.ft-sort-lb{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#A08B7F;}
+.ft-sb{background:#fff;border:1px solid var(--rb);border-radius:50px;padding:5px 12px;font-size:12px;font-weight:600;color:#6B5A52;cursor:pointer;font-family:'Hanken Grotesk',sans-serif;display:inline-flex;align-items:center;gap:4px;}
+.ft-sb.on{background:var(--v);border-color:var(--v);color:#fff;}
+@media(max-width:900px){
+  .ft-hd,.ft-row{grid-template-columns:minmax(0,1fr) 84px 96px auto;}
+  .ft-hd-pv,.ft-pv,.ft-hd-ed,.ft-ed{display:none;}
+}
 .ins-racts{display:flex;gap:5px;justify-content:flex-end;}
 .ins-sb{width:28px;height:28px;border-radius:8px;background:#F7F1EA;border:1px solid var(--rb);color:var(--v);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .ins-sb.del{background:#FBEAE7;border-color:#F3D3CE;color:#B5302E;}
@@ -1737,6 +1763,25 @@ function modalRevisarFicha(tipo,item){
   }
 }
 
+/* ordenação das fichas */
+var _ftSort='nome';
+const FT_SORTS=[
+  {k:'nome',   l:'Nome'},
+  {k:'cmv',    l:'CMV'},
+  {k:'preco',  l:'Preço'},
+  {k:'custo',  l:'Custo'},
+  {k:'editado',l:'Editado'}
+];
+function _ftCmv(x){ return (!x.preco_venda||x.preco_venda<=0)?null:(x.custo_por_porcao/x.preco_venda*100); }
+function _ftOrdena(f){
+  const s=_ftSort;
+  if(s==='nome') return f.sort((a,b)=>(a.nome||'').localeCompare(b.nome||'','pt'));
+  if(s==='cmv')  return f.sort((a,b)=>{const A=_ftCmv(a),B=_ftCmv(b); if(A==null&&B==null)return 0; if(A==null)return 1; if(B==null)return -1; return B-A;}); // maior CMV primeiro
+  if(s==='preco')return f.sort((a,b)=>(+b.preco_venda||0)-(+a.preco_venda||0));
+  if(s==='custo')return f.sort((a,b)=>(+b.custo_por_porcao||0)-(+a.custo_por_porcao||0));
+  if(s==='editado')return f.sort((a,b)=>String(b.editado_em||'').localeCompare(String(a.editado_em||'')));
+  return f;
+}
 function drawFT(w){
   w.innerHTML='';
   let f=_ftTab==='todos'?[..._ft]:
@@ -1744,6 +1789,16 @@ function drawFT(w){
     _ftTab.indexOf('beb_')===0?_ft.filter(x=>x.cardapio===_ftTab.slice(4)&&x.categoria==='bebida'):
     _ft.filter(x=>x.cardapio===_ftTab&&x.categoria!=='bebida');
   if(_ftBusca) f=f.filter(x=>x.nome.toLowerCase().includes(_ftBusca.toLowerCase()));
+  f=_ftOrdena(f.slice());
+  // barra de ordenação
+  const sortBar=div('ft-sort no-print');
+  sortBar.appendChild(span('ft-sort-lb','Ordenar por'));
+  FT_SORTS.forEach(s=>{
+    const b=el('button','ft-sb'+(_ftSort===s.k?' on':''),null,{html:s.l+(_ftSort===s.k&&s.k!=='nome'?' <i class="ph-duotone ph-arrow-down"></i>':''),
+      onclick:()=>{_ftSort=s.k;drawFT(w);}});
+    sortBar.appendChild(b);
+  });
+  w.appendChild(sortBar);
 
   const alertas=f.filter(x=>{
     if(!x.preco_venda||x.preco_venda<=0)return false;
@@ -1766,15 +1821,63 @@ function drawFT(w){
   const DEST_COR={ccmq:'#C0392B',mac:'#2C7A4B',central:'#2C5AA0',eventos:'#9A6B1E'};
   const DEST_LBL={ccmq:'CCMQ',mac:'MAC',central:'Central',eventos:'Evento'};
 
+  const tbl=div('ins-tbl');
+  const hd=div('ft-hd');
+  hd.innerHTML='<div>Ficha</div><div style="text-align:right">Custo/porção</div><div style="text-align:right" class="ft-hd-pv">Preço venda</div><div style="text-align:right">CMV</div><div class="ft-hd-ed">Editado</div><div style="text-align:right">Ações</div>';
+  tbl.appendChild(hd);
+
   f.forEach(x=>{
     const semPreco=!x.preco_venda||x.preco_venda<=0;
     const cmv=semPreco?null:(x.custo_por_porcao/x.preco_venda*100);
     const dataEd=x.editado_em?new Date(x.editado_em).toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}):null;
 
-    const card=document.createElement('div');
-    card.style.cssText='background:#fff;border:1px solid var(--rb);border-radius:16px;padding:13px 14px;margin-bottom:10px;box-shadow:0 1px 2px rgba(42,26,23,.05)'+((!semPreco&&cmv>30)?';border-color:#F3D3CE;background:#FFF7F6':'');
+    const row=div('ft-row'+((!semPreco&&cmv>30)?' alerta':''));
 
-    // Linha 1: nome + badge revisar
+    // ficha: nome + selos + revisar
+    const nome=div('ft-nome');
+    nome.appendChild(span('ft-nome-t',x.nome));
+    (x.destinos||[]).forEach(d=>{
+      const s=span('ft-sel',DEST_LBL[d]||d); s.style.background=DEST_COR[d]||'#888'; nome.appendChild(s);
+    });
+    if(x.revisar){
+      const rv=span('ft-rev'); rv.innerHTML='<i class="ph-duotone ph-warning"></i> revisar';
+      rv.title=x.revisar_motivo||''; rv.addEventListener('click',()=>modalRevisarFicha('ft',x));
+      nome.appendChild(rv);
+    }
+    row.appendChild(nome);
+
+    // custo/porção
+    row.appendChild(div('ft-num',[R(x.custo_por_porcao)]));
+    // preço venda
+    const pv=div('ft-num pv'+(semPreco?' vazio':'')); pv.classList.add('ft-pv');
+    pv.textContent=semPreco?'sem preço':R(x.preco_venda);
+    row.appendChild(pv);
+    // CMV
+    const cmvCel=div('ft-cmvcel'); cmvCel.appendChild(mkCMV(x.preco_venda,x.custo_por_porcao));
+    row.appendChild(cmvCel);
+    // editado
+    row.appendChild(div('ft-ed',[dataEd?((x.editado_por||'—')+' · '+dataEd):'—']));
+    // ações
+    const acts=div('ft-acts');
+    acts.appendChild(el('button','ins-sb'+(x.revisar?' warn':''),null,{html:'<i class="ph-duotone ph-warning"></i>',title:x.revisar?(x.revisar_motivo||'Revisar'):'Marcar para revisar',onclick:()=>modalRevisarFicha('ft',x)}));
+    acts.appendChild(el('button','ins-sb',null,{html:'<i class="ph-duotone ph-eye"></i>',title:'Ver'+(x.capa?' (com foto)':''),onclick:()=>verFichaFT(x)}));
+    acts.appendChild(el('button','ins-sb',null,{html:'<i class="ph-duotone ph-pencil-simple"></i>',title:'Editar',onclick:()=>modalFicha(x)}));
+    acts.appendChild(el('button','ins-sb del',null,{html:'<i class="ph-duotone ph-trash"></i>',title:'Excluir',onclick:async()=>{
+      if(!confirm('Excluir '+x.nome+'?'))return;
+      await db('lola_fichas_tecnicas','PATCH',{ativo:false},'?id=eq.'+x.id);
+      _ft=await db('lola_fichas_tecnicas','GET',null,'?select=*&ativo=eq.true&order=nome.asc');
+      drawFT($('#ft-t'));
+    }}));
+    row.appendChild(acts);
+    tbl.appendChild(row);
+  });
+  w.appendChild(tbl);
+}
+
+/* ── FICHAS: os cards viraram lista em 15/07. O bloco antigo foi removido. ── */
+function _ftBlocoAntigoRemovido(){
+  /*
+    Linha 1: nome + badge revisar
     const l1=document.createElement('div');l1.style.cssText='display:flex;align-items:flex-start;gap:8px;margin-bottom:6px';
     const nomeWrap=document.createElement('div');nomeWrap.style.cssText='flex:1;min-width:0';
     const nomeStrong=document.createElement('strong');nomeStrong.style.cssText='font-size:14px;display:block';nomeStrong.textContent=x.nome;
@@ -1842,6 +1945,7 @@ function drawFT(w){
     }
     w.appendChild(card);
   });
+  */
 }
 
 async function pgFichas(c){
