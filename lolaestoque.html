@@ -82,7 +82,9 @@ body{font-family:'Hanken Grotesk',sans-serif;background:var(--rf);color:var(--tx
 .ins-rupd{font-size:11px;color:#7C6A60;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .ins-rupd b{color:#5F4E46;font-weight:700;}
 .ins-rupd.none{color:#B79A8E;}
-.ins-rcusto{text-align:right;font-family:'Fraunces',serif;font-size:16px;font-weight:600;color:var(--v);white-space:nowrap;}
+.ins-rcusto{text-align:right;white-space:nowrap;}
+.ins-rcusto-v{font-family:'Fraunces',serif;font-size:16px;font-weight:600;color:var(--v);line-height:1.1;}
+.ins-rcusto-u{font-size:11px;font-weight:700;color:#7C6A60;text-transform:uppercase;letter-spacing:.5px;line-height:1.2;}
 .ins-racts{display:flex;gap:5px;justify-content:flex-end;}
 .ins-sb{width:28px;height:28px;border-radius:8px;background:#F7F1EA;border:1px solid var(--rb);color:var(--v);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .ins-sb.del{background:#FBEAE7;border-color:#F3D3CE;color:#B5302E;}
@@ -739,6 +741,9 @@ async function pgIns(c){
   }catch(e){c.innerHTML='<p style="color:red;padding:20px">'+e.message+'</p>';}
 }
 
+/* unidade de custo por extenso — aparece embaixo do preço */
+const INS_UN_EXT={kg:'por quilo',g:'por grama',L:'por litro',l:'por litro',ml:'por ml',un:'por unidade',cx:'por caixa',pct:'por pacote',molho:'por molho'};
+function insUnExt(u){const s=String(u==null?'':u).trim();return INS_UN_EXT[s]||INS_UN_EXT[s.toLowerCase()]||('por '+(s||'unidade'));}
 function mkInsTable(itens){
   const tbl=div('ins-tbl');
   const hd=div('ins-hd');
@@ -747,10 +752,9 @@ function mkInsTable(itens){
   itens.forEach(i=>{
     const unCusto=i.unidade_custo||'kg';
     const row=div('ins-row');
-    // nome + unidade
+    // nome (a unidade agora fica junto do pre\u00E7o)
     const nome=div('ins-rnome');
     nome.appendChild(document.createTextNode(i.nome));
-    nome.appendChild(span('ins-run','  \u00B7 por '+unCusto));
     row.appendChild(nome);
     // \u00FAltima atualiza\u00E7\u00E3o
     const upd=div('ins-rupd');
@@ -763,8 +767,11 @@ function mkInsTable(itens){
       upd.appendChild(document.createTextNode('Sem registro'));
     }
     row.appendChild(upd);
-    // custo
-    row.appendChild(div('ins-rcusto',[R(i.custo_por_unidade)]));
+    // custo + unidade por extenso
+    const custo=div('ins-rcusto');
+    custo.appendChild(div('ins-rcusto-v',[R(i.custo_por_unidade)]));
+    custo.appendChild(div('ins-rcusto-u',[insUnExt(unCusto)]));
+    row.appendChild(custo);
     // a\u00E7\u00F5es (Phosphor)
     const acts=div('ins-racts');
     acts.appendChild(el('button','ins-sb',null,{html:'<i class="ph-duotone ph-magnifying-glass"></i>',title:'Onde \u00E9 usado',onclick:()=>ondeEUsado(i)}));
