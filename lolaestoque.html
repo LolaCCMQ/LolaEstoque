@@ -77,7 +77,8 @@ body{font-family:'Hanken Grotesk',sans-serif;background:var(--rf);color:var(--tx
 .ins-row{border-top:1px solid #F3EBE2;}
 .ins-row:first-child{border-top:0;}
 .ins-row:hover{background:#FCF8F2;}
-.ins-rnome{font-size:14px;font-weight:700;color:var(--tx);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ins-rnome{font-size:14px;font-weight:700;color:var(--tx);min-width:0;display:flex;align-items:center;}
+.ins-rnome-t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
 .ins-run{font-size:11px;color:#A08B7F;font-weight:500;}
 .ins-rupd{font-size:11px;color:#7C6A60;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .ins-rupd b{color:#5F4E46;font-weight:700;}
@@ -85,6 +86,16 @@ body{font-family:'Hanken Grotesk',sans-serif;background:var(--rf);color:var(--tx
 .ins-rcusto{text-align:right;white-space:nowrap;}
 .ins-rcusto-v{font-family:'Fraunces',serif;font-size:16px;font-weight:600;color:var(--v);line-height:1.1;}
 .ins-rcusto-u{font-size:11px;font-weight:700;color:#7C6A60;text-transform:uppercase;letter-spacing:.5px;line-height:1.2;}
+/* onde é usado — expande na própria linha */
+.ins-rnome{cursor:pointer;}
+.ins-semrec{flex:0 0 auto;display:inline-flex;align-items:center;gap:4px;margin-left:7px;background:#FBF0DD;border:1px solid #F1DFB8;color:#9A6B1E;border-radius:50px;padding:1px 8px;font-size:10px;font-weight:700;white-space:nowrap;}
+.ins-caret{flex:0 0 auto;}
+.ins-usos{grid-column:1/-1;background:#FAF4EC;border:1px solid #EFE3D4;border-radius:10px;padding:9px 12px;margin-top:8px;font-size:12px;color:#5F4E46;line-height:1.6;}
+.ins-usos b{color:var(--v);}
+.ins-usos .ug+.ug{margin-top:4px;}
+.ins-usos .uinfo{color:#8A7A72;}
+.ins-caret{font-size:12px;color:#B79A8E;margin-left:5px;transition:transform .15s;display:inline-block;}
+.ins-row.open .ins-caret{transform:rotate(90deg);}
 .ins-racts{display:flex;gap:5px;justify-content:flex-end;}
 .ins-sb{width:28px;height:28px;border-radius:8px;background:#F7F1EA;border:1px solid var(--rb);color:var(--v);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .ins-sb.del{background:#FBEAE7;border-color:#F3D3CE;color:#B5302E;}
@@ -689,6 +700,10 @@ async function pgIns(c){
   c.appendChild(ld());
   try{
     _ins=await db('lola_insumos','GET',null,'?select=*&ativo=eq.true&order=categoria.asc,nome.asc');
+    // quais insumos entram em alguma pré-produção ou ficha (mesma função que a Central usa)
+    try{ const uu=await db('rpc/central_insumos_usados','POST',{});
+         _insUsados=new Set((uu||[]).map(x=>(x&&typeof x==='object')?Object.values(x)[0]:x)); }
+    catch(e){ _insUsados=null; }
     c.innerHTML='';
     // filtros de categoria
     const CATS_ORDER=['Bebidas Alcoólicas','Bebidas Não Alcoólicas','Cervejas','Vinhos','Carnes e Pescados','Hortifruti','Insumos Alimentos','Limpeza','Pães'];
@@ -741,6 +756,31 @@ async function pgIns(c){
   }catch(e){c.innerHTML='<p style="color:red;padding:20px">'+e.message+'</p>';}
 }
 
+/* onde é usado: só marcamos "fora de receita" nas categorias que DEVERIAM estar numa */
+var _insUsados=null;
+const INS_CATS_RECEITA=new Set(['Insumos Alimentos','Carnes e Pescados','Hortifruti','Pães']);
+function insForaDeReceita(i){
+  if(!_insUsados) return false;                       // não carregou → não acusa
+  if(!INS_CATS_RECEITA.has(i.categoria)) return false; // bebida/limpeza/descartável: normal não estar
+  return !_insUsados.has(i.id);
+}
+async function toggleUsosIns(row,i){
+  let box=row.querySelector('.ins-usos');
+  if(box){ box.remove(); row.classList.remove('open'); return; }
+  row.classList.add('open');
+  box=div('ins-usos'); box.innerHTML='<span class="uinfo">buscando…</span>'; row.appendChild(box);
+  try{
+    const r=await db('rpc/central_insumo_usos','POST',{iid:i.id});
+    const d=Array.isArray(r)?r[0]:r;
+    const pp=(d&&d.preproducoes)||[], pr=(d&&d.pratos)||[];
+    if(!pp.length&&!pr.length){ box.innerHTML='<span class="uinfo">Não entra em nenhuma receita cadastrada.</span>'; return; }
+    let h='';
+    if(pp.length) h+='<div class="ug"><b>Pré-produções ('+pp.length+'):</b> '+pp.map(x=>_uEsc(x)).join(' · ')+'</div>';
+    if(pr.length) h+='<div class="ug"><b>Pratos ('+pr.length+'):</b> '+pr.map(x=>_uEsc(x)).join(' · ')+'</div>';
+    box.innerHTML=h;
+  }catch(e){ box.innerHTML='<span class="uinfo">Erro ao buscar: '+_uEsc(e.message)+'</span>'; }
+}
+function _uEsc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 /* unidade de custo por extenso — aparece embaixo do preço */
 const INS_UN_EXT={kg:'por quilo',g:'por grama',L:'por litro',l:'por litro',ml:'por ml',un:'por unidade',cx:'por caixa',pct:'por pacote',molho:'por molho'};
 function insUnExt(u){const s=String(u==null?'':u).trim();return INS_UN_EXT[s]||INS_UN_EXT[s.toLowerCase()]||('por '+(s||'unidade'));}
@@ -752,9 +792,16 @@ function mkInsTable(itens){
   itens.forEach(i=>{
     const unCusto=i.unidade_custo||'kg';
     const row=div('ins-row');
-    // nome (a unidade agora fica junto do pre\u00E7o)
+    // nome \u2014 clic\u00E1vel, abre "onde \u00E9 usado" na pr\u00F3pria linha
     const nome=div('ins-rnome');
-    nome.appendChild(document.createTextNode(i.nome));
+    nome.appendChild(span('ins-rnome-t',i.nome));
+    const car=document.createElement('i'); car.className='ph-duotone ph-caret-right ins-caret'; nome.appendChild(car);
+    if(insForaDeReceita(i)){
+      const sr=span('ins-semrec'); sr.innerHTML='<i class="ph-duotone ph-warning-circle"></i> n\u00E3o est\u00E1 em receita';
+      nome.appendChild(sr);
+    }
+    nome.title='Ver onde \u00E9 usado';
+    nome.addEventListener('click',()=>toggleUsosIns(row,i));
     row.appendChild(nome);
     // \u00FAltima atualiza\u00E7\u00E3o
     const upd=div('ins-rupd');
