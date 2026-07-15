@@ -4281,6 +4281,62 @@ async function updEnviosBadge(){
 }
 const _envEsc=s=>String(s==null?'':s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
 function _envQtd(q){return N(q,3).replace(/,?0+$/,'')||'0';}
+/* conversão de unidade — espelha a função central_conv_qtd do banco. null = não dá pra converter */
+const _ENV_UN_SIN={l:'l',lt:'l',litro:'l',litros:'l',un:'un',und:'un',unid:'un',unidade:'un',pc:'un',pct:'un',pacote:'un','maco':'un','maço':'un',cx:'un',caixa:'un',bdj:'un',bandeja:'un'};
+function _envUn(u){const s=String(u==null?'':u).trim().toLowerCase();return _ENV_UN_SIN[s]||s;}
+function _envConv(q,unO,unD,pesoG){
+  q=Number(q); if(!isFinite(q))return null;
+  const a=_envUn(unO), b=_envUn(unD);
+  if(!a||!b)return null;
+  if(a===b)return q;
+  if(a==='g'&&b==='kg')return q/1000;
+  if(a==='kg'&&b==='g')return q*1000;
+  if(a==='ml'&&b==='l')return q/1000;
+  if(a==='l'&&b==='ml')return q*1000;
+  if(a==='l'&&b==='kg')return q;
+  if(a==='kg'&&b==='l')return q;
+  if(a==='ml'&&b==='kg')return q/1000;
+  if(a==='g'&&b==='l')return q/1000;
+  if(a==='ml'&&b==='g')return q;
+  if(a==='g'&&b==='ml')return q;
+  const p=Number(pesoG);
+  if(a==='un'&&isFinite(p)&&p>0){
+    if(b==='kg')return q*p/1000;
+    if(b==='g')return q*p;
+    if(b==='l')return q*p/1000;
+    if(b==='ml')return q*p;
+  }
+  if(b==='un'&&isFinite(p)&&p>0){
+    if(a==='kg')return q*1000/p;
+    if(a==='g')return q/p;
+  }
+  return null;
+}
+/* {ok:false} = falta o peso pra converter — não mostra custo nem deixa lançar no Financeiro */
+function _envCusto(e,ci){
+  if(e.custo_total!=null)return{ok:true,v:Number(e.custo_total)};
+  if(!ci||e.quantidade==null)return{ok:true,v:0};
+  const cu=Number(ci.custo_por_unidade||0), unC=ci.unidade_custo;
+  if(!unC||!cu)return{ok:true,v:0};
+  const q=_envConv(e.quantidade,(e.unidade&&String(e.unidade).trim())||unC,unC,ci.peso_un_g);
+  if(q==null)return{ok:false,v:0};
+  return{ok:true,v:q*cu,qtd:q};
+}
+async function _envPedirPeso(e,ci){
+  const unE=(e.unidade&&String(e.unidade).trim())||'un';
+  const unC=(ci&&ci.unidade_custo)||'kg';
+  const nome=(ci&&ci.nome)||e.descricao;
+  const atual=(ci&&ci.peso_un_g!=null)?String(ci.peso_un_g):'';
+  const v=prompt('Quanto pesa 1 '+unE+' de "'+nome+'" em gramas?\n\nO custo deste insumo está cadastrado por '+unC+', então preciso do peso pra converter e calcular o valor certo.\n\nEx.: 110',atual);
+  if(v==null)return;
+  const p=parseFloat(String(v).replace(',','.'));
+  if(!isFinite(p)||p<=0){alert('Peso inválido. Informe um número em gramas, ex.: 110');return;}
+  try{
+    await db('lola_insumos','PATCH',{peso_un_g:p},'?id=eq.'+((ci&&ci.id)||e.insumo_id));
+    alert('Peso salvo: 1 '+unE+' = '+_envQtd(p)+' g.\n\nO custo já é calculado com isso. Confira o valor e clique em Recebido.');
+    renderPage();
+  }catch(err){alert('Erro ao salvar o peso: '+err.message);}
+}
 async function pgEnvios(c){
   c.appendChild(ld());
   try{
@@ -4288,7 +4344,7 @@ async function pgEnvios(c){
     const insIds=[...new Set(envios.filter(e=>e.insumo_id).map(e=>e.insumo_id))];
     let custoMap={};
     if(insIds.length){
-      const ins=await db('lola_insumos','GET',null,'?select=id,nome,custo_por_unidade,unidade_custo&id=in.('+insIds.join(',')+')');
+      const ins=await db('lola_insumos','GET',null,'?select=id,nome,custo_por_unidade,unidade_custo,peso_un_g&id=in.('+insIds.join(',')+')');
       ins.forEach(i=>custoMap[i.id]=i);
     }
     c.innerHTML='';
@@ -4308,8 +4364,8 @@ async function pgEnvios(c){
 
     function card(e){
       const custoInfo=e.insumo_id&&custoMap[e.insumo_id]?custoMap[e.insumo_id]:null;
-      const custoUnit=custoInfo?Number(custoInfo.custo_por_unidade||0):0;
-      const custoTot=e.custo_total!=null?Number(e.custo_total):((e.quantidade&&custoUnit)?e.quantidade*custoUnit:0);
+      const cst=_envCusto(e,custoInfo);
+      const custoTot=cst.v;
       const wrap=div(null);
       wrap.style.cssText='background:#fff;border:1.5px solid var(--rb);border-radius:14px;padding:14px 16px;margin-bottom:10px'+(e.atendido?';opacity:.72':'');
       let html='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">';
@@ -4320,12 +4376,19 @@ async function pgEnvios(c){
       if(e.prato)html+='<div style="font-size:12px;color:var(--ts);margin-bottom:3px"><i class="ph-duotone ph-fork-knife" style="color:var(--v)"></i> Prato: <b>'+_envEsc(e.prato)+'</b></div>';
       html+='<div style="font-size:12px;color:var(--ts);margin-bottom:3px"><i class="ph-duotone ph-calendar" style="color:var(--v)"></i> Enviado '+DBR(String(e.data).slice(0,10))+(e.responsavel?' · '+_envEsc(e.responsavel):'')+'</div>';
       if(e.observacao)html+='<div style="font-size:12px;color:var(--ts);margin-bottom:3px"><i class="ph-duotone ph-note" style="color:var(--v)"></i> '+_envEsc(e.observacao)+'</div>';
-      if(custoTot>0)html+='<div style="font-size:12px;color:var(--ts)"><i class="ph-duotone ph-currency-circle-dollar" style="color:var(--v)"></i> Custo estimado: <b>'+R(custoTot)+'</b></div>';
+      if(cst.ok&&custoTot>0)html+='<div style="font-size:12px;color:var(--ts)"><i class="ph-duotone ph-currency-circle-dollar" style="color:var(--v)"></i> Custo estimado: <b>'+R(custoTot)+'</b>'+(cst.qtd!=null&&_envUn(e.unidade)!==_envUn(custoInfo&&custoInfo.unidade_custo)?' <span style="color:var(--rm)">('+_envQtd(cst.qtd)+' '+_envEsc((custoInfo&&custoInfo.unidade_custo)||'')+')</span>':'')+'</div>';
+      if(!cst.ok)html+='<div style="font-size:12px;color:#9A6B1E;background:#FBF0DD;border:1px solid #F1DFB8;border-radius:9px;padding:7px 9px;margin-top:4px"><i class="ph-duotone ph-warning"></i> Falta o peso de <b>1 '+_envEsc(e.unidade||'un')+'</b> pra converter em '+_envEsc((custoInfo&&custoInfo.unidade_custo)||'')+' e calcular o custo.</div>';
       if(e.atendido&&e.recebido_por)html+='<div style="font-size:11px;color:var(--rm);margin-top:5px">Recebido por '+_envEsc(e.recebido_por)+(e.recebido_em?' · '+new Date(e.recebido_em).toLocaleDateString('pt-BR'):'')+'</div>';
       wrap.innerHTML=html;
       const acts=div(null);
       if(!e.atendido){
         acts.style.cssText='display:flex;gap:8px;margin-top:12px';
+        if(!cst.ok){
+          const bP=el('button','btn bo',null,{html:'<i class="ph-duotone ph-scales"></i> Informar peso'});
+          bP.style.cssText='flex:1;padding:11px;font-size:13px;font-weight:800';
+          bP.onclick=()=>_envPedirPeso(e,custoInfo);
+          acts.appendChild(bP);
+        }
         const bRec=el('button','btn bp',null,{html:'<i class="ph-duotone ph-check"></i> Recebido'});
         bRec.style.cssText='flex:1;padding:11px;font-size:13px;font-weight:800';
         bRec.onclick=()=>receberEnvio(e,custoInfo);
@@ -4352,14 +4415,15 @@ async function pgEnvios(c){
   }catch(err){c.innerHTML='<div style="padding:20px;color:red;font-weight:700">❌ Erro ao carregar.<br><small>'+_envEsc(err.message)+'</small></div>';}
 }
 async function receberEnvio(e,custoInfo){
-  const custoUnit=custoInfo?Number(custoInfo.custo_por_unidade||0):0;
-  const custoTot=(e.quantidade&&custoUnit)?e.quantidade*custoUnit:0;
+  const _cst=_envCusto(e,custoInfo);
+  if(!_cst.ok){ return _envPedirPeso(e,custoInfo); }
+  const custoTot=_cst.v;
   if(!confirm('Confirmar recebimento de "'+e.descricao+'"'+(custoTot>0?' (custo '+R(custoTot)+')':'')+'?\n\nIsso dá baixa no estoque da Central e lança a transferência no Financeiro das duas contas.'))return;
   try{
     await db('rpc/envio_ccmq_receber','POST',{p_envio_id:e.id,p_quem:ME||null});
     updEnviosBadge();
     renderPage();
-  }catch(err){alert('Erro ao receber: '+err.message);}
+  }catch(err){ if(String((err&&err.message)||'').indexOf('CONV_FALTA_PESO')>=0){ _envPedirPeso(e,custoInfo); return; } alert('Erro ao receber: '+err.message);}
 }
 async function desfazerEnvio(e){
   if(!confirm('Desfazer o recebimento de "'+e.descricao+'"?\n\nRemove a baixa na Central e os lançamentos de transferência no Financeiro.'))return;
