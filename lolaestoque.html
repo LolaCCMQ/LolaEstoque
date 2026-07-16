@@ -827,8 +827,8 @@ function mkInsTable(itens){
       const sr=span('ins-semrec'); sr.innerHTML='<i class="ph-duotone ph-warning-circle"></i> n\u00E3o est\u00E1 em receita';
       nome.appendChild(sr);
     }
-    nome.title='Ver onde \u00E9 usado';
-    nome.addEventListener('click',()=>toggleUsosIns(row,i));
+    nome.title='Abrir a ficha completa \u2014 pre\u00E7o, de qual nota veio, fornecedor, saldo, onde \u00E9 usado';
+    nome.addEventListener('click',()=>abrirFichaInsumo(i.id,i.nome));
     row.appendChild(nome);
     // \u00FAltima atualiza\u00E7\u00E3o
     const upd=div('ins-rupd');
@@ -5656,6 +5656,157 @@ async function imprimirPed(ped){
    HELPERS
 ══════════════════════════════════ */
 // ── fichaTable: modal com formato planilha ─────────────────────────────────
+/* ══════════════════════════════════════════════════════════════
+   FICHA DO INSUMO — painel com TUDO: preço, de qual nota veio,
+   fornecedor, saldo, FC, onde é usado e histórico.
+   Puxa da função insumo_ficha(uuid) do banco. — 16/07
+   ══════════════════════════════════════════════════════════════ */
+const _IFE=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function _ifData(d){ if(!d)return'—'; const p=String(d).slice(0,10).split('-'); return p.length===3?(p[2]+'/'+p[1]+'/'+p[0]):d; }
+function _ifNum(v,c){ return (+v||0).toLocaleString('pt-BR',{maximumFractionDigits:c==null?3:c}); }
+
+async function abrirFichaInsumo(insumoId, nomeFallback){
+  const ov=div('ov'); const mo=div('mo mol');
+  mo.addEventListener('click',e=>e.stopPropagation());
+  ov.addEventListener('click',e=>{ if(e.target===ov) ov.remove(); });
+  mo.appendChild(div('mh',[el('h3',null,nomeFallback||'Insumo'),btn('xb','✕',()=>ov.remove())]));
+  const mb=div('mb'); mb.appendChild(div('ld',[div('sp'),document.createTextNode('Buscando...')]));
+  mo.appendChild(mb); ov.appendChild(mo); document.body.appendChild(ov);
+  try{
+    const r=await db('rpc/insumo_ficha','POST',{iid:insumoId});
+    const d=Array.isArray(r)?r[0]:r;
+    if(!d||!d.cadastro){ mb.innerHTML='<p class="tss">Não encontrei os dados deste insumo.</p>'; return; }
+    _renderFichaInsumo(mb, d, ov);
+    const h3=mo.querySelector('h3'); if(h3) h3.textContent=d.cadastro.nome||nomeFallback||'Insumo';
+  }catch(e){ mb.innerHTML='<p style="color:#B5302E;padding:10px">Erro: '+_IFE(e.message)+'</p>'; }
+}
+
+function _renderFichaInsumo(mb, d, ov){
+  const c=d.cadastro||{}, uc=c.unidade_custo||'kg';
+  const compra=d.ultima_compra, fc=d.fc, saldo=d.saldo||{};
+  const cad=+c.custo_por_unidade||0, ult=compra?(+compra.preco_unit||0):0;
+  const dif=(cad>0&&ult>0)?((ult-cad)/cad*100):0;
+  const desatualizado = compra && Math.abs(dif)>=1;
+
+  let h='';
+  /* topo: cadastrado × última compra */
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">';
+  h+= '<div style="background:#fff;border:1px solid var(--rb);border-radius:12px;padding:11px 13px">'
+    +   '<div style="font-size:9px;font-weight:800;letter-spacing:1px;color:#A08B7F;text-transform:uppercase">Custo cadastrado</div>'
+    +   '<div style="font-family:Fraunces,serif;font-size:22px;font-weight:600;color:var(--v);line-height:1.1;margin-top:2px">'+R(cad)+'</div>'
+    +   '<div style="font-size:11px;font-weight:700;color:#7C6A60;text-transform:uppercase;letter-spacing:.5px">'+_IFE(insUnExt(uc))+'</div>'
+    +   '<div style="font-size:10px;color:#B79A8E;margin-top:4px"><i class="ph-duotone ph-clock-counter-clockwise"></i> '
+    +     (c.preco_atualizado_em?('atualizado '+_ifData(c.preco_atualizado_em)+(c.preco_atualizado_por?(' por '+_IFE(c.preco_atualizado_por)):'')):'sem atualização registrada')
+    +   '</div></div>';
+  if(compra){
+    const alerta=desatualizado;
+    h+= '<div style="background:'+(alerta?'#FBF0DD':'#fff')+';border:1px solid '+(alerta?'#F1DFB8':'var(--rb)')+';border-radius:12px;padding:11px 13px">'
+      +   '<div style="font-size:9px;font-weight:800;letter-spacing:1px;color:'+(alerta?'#9A6B1E':'#A08B7F')+';text-transform:uppercase">Última compra</div>'
+      +   '<div style="font-family:Fraunces,serif;font-size:22px;font-weight:600;color:'+(alerta?'#9A6B1E':'var(--v)')+';line-height:1.1;margin-top:2px">'+R(ult)+'</div>'
+      +   '<div style="font-size:11px;font-weight:700;color:'+(alerta?'#9A6B1E':'#7C6A60')+';text-transform:uppercase;letter-spacing:.5px">por '+_IFE(compra.unidade||uc)+' · '+_ifData(compra.data)+'</div>'
+      +   (alerta?('<div style="font-size:10px;color:#9A6B1E;margin-top:4px;font-weight:700"><i class="ph-duotone ph-warning-circle"></i> '+(dif>0?'+':'')+_ifNum(dif,1)+'% em relação ao cadastro</div>'):'')
+      + '</div>';
+  } else {
+    h+='<div style="background:#fff;border:1px solid var(--rb);border-radius:12px;padding:11px 13px">'
+      +'<div style="font-size:9px;font-weight:800;letter-spacing:1px;color:#A08B7F;text-transform:uppercase">Última compra</div>'
+      +'<div style="font-size:12px;color:#B79A8E;margin-top:6px">Nenhuma entrada por nota registrada.</div></div>';
+  }
+  h+='</div>';
+
+  /* de onde veio */
+  if(compra){
+    h+='<div style="font-size:10px;font-weight:800;letter-spacing:1px;color:#A08B7F;text-transform:uppercase;margin:0 2px 6px">De onde veio esse preço</div>';
+    h+='<div style="background:#fff;border:1px solid var(--rb);border-radius:12px;padding:12px 14px;margin-bottom:14px">';
+    h+= '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
+      +  '<span style="width:26px;height:26px;border-radius:8px;background:#E6F3EA;color:#2C7A4B;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0"><i class="ph-duotone ph-'+(compra.origem_tipo==='manual'?'pencil-simple':'receipt')+'"></i></span>'
+      +  '<div style="flex:1;min-width:0">'
+      +    '<div style="font-size:13px;font-weight:700;color:var(--tx)">'+_IFE(compra.fornecedor||'(entrada manual — sem nota)')+'</div>'
+      +    '<div style="font-size:11px;color:#8A7A72">'+(compra.nota_numero?('Nota '+_IFE(compra.nota_numero)+' · '):'')+_ifData(compra.data)+(compra.lancado_por?(' · lançada por '+_IFE(compra.lancado_por)):'')+'</div>'
+      +  '</div></div>';
+    h+= '<div style="border-top:1px solid #F3EBE2;padding-top:8px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">'
+      +  '<div><div style="font-size:9px;color:#A08B7F;text-transform:uppercase;letter-spacing:.5px">Quantidade</div><div style="font-size:13px;font-weight:700">'+_ifNum(compra.qtd)+' '+_IFE(compra.unidade||'')+'</div></div>'
+      +  '<div><div style="font-size:9px;color:#A08B7F;text-transform:uppercase;letter-spacing:.5px">Preço unit.</div><div style="font-size:13px;font-weight:700">'+R(compra.preco_unit)+'</div></div>'
+      +  '<div><div style="font-size:9px;color:#A08B7F;text-transform:uppercase;letter-spacing:.5px">Total</div><div style="font-size:13px;font-weight:700">'+R(compra.total)+'</div></div>'
+      + '</div>';
+    if(compra.descricao_na_nota){
+      h+='<div style="border-top:1px solid #F3EBE2;padding-top:8px;margin-top:8px">'
+        +'<div style="font-size:9px;color:#A08B7F;text-transform:uppercase;letter-spacing:.5px">Como veio escrito na nota</div>'
+        +'<div style="font-size:12px;color:#5F4E46;font-style:italic">"'+_IFE(compra.descricao_na_nota)+'"</div></div>';
+    }
+    if(desatualizado){
+      h+='<button id="ifUsarPreco" style="width:100%;margin-top:10px;background:var(--v);color:#fff;border:0;border-radius:9px;padding:9px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">Usar '+R(ult)+' como custo atual</button>';
+    }
+    h+='</div>';
+  }
+
+  /* saldo + FC */
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">';
+  h+= '<div style="background:#fff;border:1px solid var(--rb);border-radius:12px;padding:11px 13px">'
+    +  '<div style="font-size:9px;font-weight:800;letter-spacing:1px;color:#A08B7F;text-transform:uppercase">Saldo em estoque</div>'
+    +  '<div style="font-size:16px;font-weight:700;margin-top:2px">'+_ifNum(saldo.qtd)+' '+_IFE(uc)+'</div>'
+    +  '<div style="font-size:11px;color:#8A7A72">'+R(saldo.valor)+'</div></div>';
+  h+= '<div style="background:#fff;border:1px solid var(--rb);border-radius:12px;padding:11px 13px">'
+    +  '<div style="font-size:9px;font-weight:800;letter-spacing:1px;color:#A08B7F;text-transform:uppercase">Peso / fator</div>'
+    +  '<div style="font-size:16px;font-weight:700;margin-top:2px">'+((fc&&fc.fc)?('FC '+_ifNum(fc.fc,2)):(c.peso_un_g?(_ifNum(c.peso_un_g,0)+' g/un'):'—'))+'</div>'
+    +  '<div style="font-size:11px;color:#8A7A72">'+((fc&&fc.peso_medio_g)?('1 un ≈ '+_ifNum(fc.peso_medio_g,0)+' g'):(c.peso_un_g?'peso da embalagem':'sem fator cadastrado'))+'</div></div>';
+  h+='</div>';
+
+  /* onde é usado */
+  const usos=d.usado_em||[];
+  h+='<div style="font-size:10px;font-weight:800;letter-spacing:1px;color:#A08B7F;text-transform:uppercase;margin:0 2px 6px">Onde é usado ('+usos.length+')</div>';
+  if(!usos.length){ h+='<div style="background:#fff;border:1px solid var(--rb);border-radius:12px;padding:12px;font-size:11px;color:#B79A8E;margin-bottom:14px">Não entra em nenhuma receita.</div>'; }
+  else{
+    h+='<div style="background:#fff;border:1px solid var(--rb);border-radius:12px;overflow:hidden;margin-bottom:14px">';
+    usos.forEach((u,i)=>{
+      h+='<div style="display:flex;align-items:center;gap:8px;padding:9px 13px'+(i?';border-top:1px solid #F3EBE2':'')+'">'
+        +'<span style="font-size:9px;font-weight:800;padding:2px 7px;border-radius:50px;background:'+(u.tipo==='preparo'?'#7A4FA3':'#C0392B')+';color:#fff;flex-shrink:0">'+(u.tipo==='preparo'?'PREPARO':'PRATO')+'</span>'
+        +'<div style="flex:1;min-width:0;font-size:12.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+_IFE(u.nome)+'</div>'
+        +'<div style="text-align:right;flex-shrink:0"><div style="font-size:12px;font-weight:700">'+_ifNum(u.qtd)+' '+_IFE(u.unidade||'')+'</div>'
+        +'<div style="font-size:10px;color:#8A7A72">'+R(u.custo)+(u.fc&&+u.fc!==1?(' · FC '+_ifNum(u.fc,2)):'')+'</div></div></div>';
+    });
+    h+='</div>';
+  }
+
+  /* histórico */
+  const hist=d.historico_preco||[];
+  h+='<div style="font-size:10px;font-weight:800;letter-spacing:1px;color:#A08B7F;text-transform:uppercase;margin:0 2px 6px">Histórico de preço</div>';
+  if(!hist.length){
+    h+='<div style="background:#fff;border:1px solid var(--rb);border-radius:12px;padding:14px;text-align:center;font-size:11px;color:#B79A8E;line-height:1.5">Nenhuma alteração registrada ainda.<br>A partir de agora, toda mudança grava <b style="color:#7C6A60">de onde veio</b> — nota, planilha do mês ou manual.</div>';
+  }else{
+    h+='<div style="background:#fff;border:1px solid var(--rb);border-radius:12px;overflow:hidden">';
+    hist.forEach((x,i)=>{
+      const de=+x.de||0, para=+x.para||0;
+      const sobe=para>de, v=de>0?((para-de)/de*100):0;
+      const ORI={nota:'da nota',planilha:'da planilha do mês',manual:'na mão',correcao:'correção de cadastro'};
+      h+='<div style="display:flex;align-items:center;gap:8px;padding:9px 13px'+(i?';border-top:1px solid #F3EBE2':'')+'">'
+        +'<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:700">'+R(de)+' → '+R(para)+'</div>'
+        +'<div style="font-size:10px;color:#8A7A72">'+_ifData(x.quando)+(x.quem?(' · '+_IFE(x.quem)):'')
+        + (x.origem?(' · <b style="color:#7C6A60">'+_IFE(ORI[x.origem]||x.origem)+'</b>'):'') +'</div></div>'
+        +(de>0?('<span style="font-size:11px;font-weight:800;color:'+(sobe?'#B5302E':'#2C7A4B')+';flex-shrink:0">'+(sobe?'▲':'▼')+' '+_ifNum(Math.abs(v),0)+'%</span>'):'')
+        +'</div>';
+    });
+    h+='</div>';
+  }
+
+  mb.innerHTML=h;
+
+  /* botão: adotar o preço da nota */
+  const bt=mb.querySelector('#ifUsarPreco');
+  if(bt) bt.onclick=async()=>{
+    bt.disabled=true; bt.textContent='Salvando...';
+    try{
+      await db('lola_insumos_historico','POST',{insumo_id:c.id,custo_anterior:cad,custo_novo:ult,
+        alterado_por:ME||null,origem:'nota',origem_ref:compra.nota_chave||null,
+        observacao:'Adotado da nota '+(compra.nota_numero||'')+' — '+(compra.fornecedor||'')});
+      await db('lola_insumos','PATCH',{custo_por_unidade:ult,preco_atualizado_em:new Date().toISOString(),preco_atualizado_por:ME||null},'?id=eq.'+c.id);
+      _ins=await db('lola_insumos','GET',null,'?select=*&ativo=eq.true&order=categoria.asc,nome.asc');
+      ov.remove();
+      alert('✅ Custo atualizado para '+R(ult)+'.\n\nRegistrado que veio da nota '+(compra.nota_numero||'')+'.\n\n⚠️ As receitas que usam este insumo ainda NÃO recalculam sozinhas — abra e salve cada uma, ou espere a cascata.');
+      try{ if(PAGE==='insumos'&&window._drawIns) window._drawIns(document.getElementById('ins-t')); }catch(_){}
+    }catch(e){ alert('Erro: '+e.message); bt.disabled=false; bt.textContent='Usar '+R(ult)+' como custo atual'; }
+  };
+}
+
 function fichaTable(itens,rendQtd,rendUn,custoTotal,custoPorcao,titulo,historico,fotos){
   // Construção imperativa para evitar bugs com null/string em children
   function td(txt,style,children){
@@ -5704,7 +5855,17 @@ function fichaTable(itens,rendQtd,rendUn,custoTotal,custoPorcao,titulo,historico
     badge.className='bq '+(isPP?'bce':'bc');
     badge.textContent=isPP?'PP':'Ins';
     tdNome.appendChild(badge);
-    tdNome.appendChild(document.createTextNode(' '+nome));
+    if(!isPP && it.insumo_id){
+      // insumo: clicar abre a ficha completa (preço, de qual nota veio, fornecedor, saldo, usos)
+      const lk=document.createElement('span');
+      lk.textContent=' '+nome;
+      lk.style.cssText='cursor:pointer;border-bottom:1px dashed var(--v);color:var(--v);font-weight:600';
+      lk.title='Ver a ficha deste insumo — preço, nota, fornecedor';
+      lk.addEventListener('click',()=>abrirFichaInsumo(it.insumo_id,nome));
+      tdNome.appendChild(lk);
+    } else {
+      tdNome.appendChild(document.createTextNode(' '+nome));
+    }
     tr.appendChild(tdNome);
     tr.appendChild(td(it.nome_manual||'','padding:8px 10px;font-size:11px;color:var(--ts)'));
     tr.appendChild(td(it.unidade||'g','padding:8px 10px;font-size:12px;text-align:center'));
