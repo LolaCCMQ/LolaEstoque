@@ -5021,6 +5021,39 @@ async function modalNovoPedido(){
 
   let _buscaNovoPed='';
 
+  /* ── Preço/unidade da pré-produção no pedido — REGRA ÚNICA ──────────────
+     Havia duas cópias disso, com contas diferentes, e o mesmo item saía com
+     preços diferentes dependendo da tela (Lasanha: 38,53 numa e 89,90 noutra;
+     Risotinho ia a R$ 2.573). Agora as duas telas chamam estas funções.
+     • Vende por PORÇÃO só quando o rendimento é a granel (g/ml/kg/L) e existe
+       porção declarada — senão a conta divide un por g e estoura.
+     • Margem: custo/(m/100), a MESMA fórmula do editor da pré-produção
+       (o "70" ali significa CMV de 70%). Nunca custo/(1-m).                  */
+  function _ppBulk(x){ return ['g','ml','kg','L'].includes(x.rendimento_un||'un'); }
+  function _ppPorcao(x){
+    const pq=parseFloat(x.porcao_qtd)||0, pu=x.porcao_un||'';
+    return (_ppBulk(x) && pq>0 && pu && pu!==(x.rendimento_un||'un')) ? pq : 0;
+  }
+  function ppPreco(x){
+    const pq=_ppPorcao(x);
+    if(pq>0){
+      const numP=(parseFloat(x.rendimento_qtd)||1)/pq;
+      if(numP>0) return (parseFloat(x.custo_total||0)/numP)/((parseFloat(x.margem_venda)||70)/100);
+    }
+    return parseFloat(x.valor_venda_central)||0;
+  }
+  function ppUnidade(x){
+    const ru=x.rendimento_un||'un';
+    if(_ppPorcao(x)>0) return (x.porcao_un==='un')?'porção':x.porcao_un;
+    return ru==='g'?'kg':ru==='ml'?'L':ru;
+  }
+  function ppInfo(x){
+    const pq=_ppPorcao(x);
+    if(!pq) return '';
+    const numP=(parseFloat(x.rendimento_qtd)||1)/pq;
+    return '(porção de '+pq+' '+(x.rendimento_un||'')+' — '+numP.toFixed(1)+' porções)';
+  }
+
   function buildItens(){
     itensArea.innerHTML='';
 
@@ -5099,28 +5132,8 @@ async function modalNovoPedido(){
       x=>x.nome
     );
 
-    // Grupo pré-produções
-    mkGrupo('🍳 Pré-produções',ppDest,
-      x=>{
-        const ru=x.rendimento_un||'un';
-        const bulk=['g','ml','kg','L'].includes(ru);
-        const porcaoQtd=parseFloat(x.porcao_qtd)||0;
-        const porcaoUn=x.porcao_un||'';
-        // Porção só quando o rendimento é a GRANEL (g/ml/kg/L). Se rende em un/porção, pede pela unidade.
-        if(bulk&&porcaoQtd>0&&porcaoUn&&porcaoUn!==ru){
-          const numP=(parseFloat(x.rendimento_qtd)||1)/porcaoQtd;
-          return (parseFloat(x.custo_total||0)/numP)/(parseFloat(x.margem_venda||70)/100);
-        }
-        return parseFloat(x.valor_venda_central)||0;
-      },
-      x=>{
-        const ru=x.rendimento_un||'un';
-        const bulk=['g','ml','kg','L'].includes(ru);
-        const porcaoQtd=parseFloat(x.porcao_qtd)||0;
-        const porcaoUn=x.porcao_un||'';
-        if(bulk&&porcaoQtd>0&&porcaoUn&&porcaoUn!==ru) return porcaoUn==='un'?'porção':porcaoUn;
-        return ru==='g'?'kg':ru==='ml'?'L':ru;
-      },
+    // Grupo pré-produções — usa as regras compartilhadas (ppPreco/ppUnidade), as mesmas do autocomplete
+    mkGrupo('🍳 Pré-produções',ppDest, ppPreco, ppUnidade,
       x=>'pp_'+x.id,
       x=>x.nome
     );
@@ -5377,21 +5390,11 @@ async function editarPedido(ped){
       // Montar lista completa de itens para autocomplete
       let listaTotal=[];
       if(tipoAdd==='preprods'){
+         /* MESMA regra da lista de grupos (ppPreco/ppUnidade) — antes daqui saía outro preço:
+            usava custo/(1-m) em vez de custo/m (o editor usa /m) e não tinha a trava do "granel",
+            então dividia 8 un por 200 g e o Risotinho ia a R$ 2.573. Uma regra só. — 15/07 */
          listaTotal=_pp.map(x=>{
-           const ru=x.rendimento_un||'un';
-           const porcaoQtd=parseFloat(x.porcao_qtd)||0;
-           const porcaoUn=x.porcao_un||'';
-           if(porcaoQtd>0 && porcaoUn && porcaoUn!==ru){
-             const rendQtd=parseFloat(x.rendimento_qtd)||1;
-             const numPorcoes=rendQtd/porcaoQtd;
-             const custoPorcao=parseFloat(x.custo_total||0)/numPorcoes;
-             const vendaPorcao=custoPorcao/(1-(parseFloat(x.margem_venda||70)/100));
-             const unLabel=porcaoUn==='un'?'porção':porcaoUn;
-             return {nome:x.nome,unidade:unLabel,preco:vendaPorcao,tipo:'prep',cat:x.categoria,
-                     info:'('+porcaoQtd+ru+'/porção — '+numPorcoes.toFixed(1)+' porções)'};
-           }
-           const unidade=ru==='g'?'kg':ru==='ml'?'L':ru;
-           return {nome:x.nome,unidade,preco:x.valor_venda_central,cat:x.categoria};
+           return {nome:x.nome,unidade:ppUnidade(x),preco:ppPreco(x),cat:x.categoria,info:ppInfo(x)};
          }).sort((a,b)=>a.nome.localeCompare(b.nome,'pt'));
       } else {
         listaTotal=_ins.map(x=>{
