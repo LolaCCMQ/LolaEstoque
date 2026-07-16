@@ -115,13 +115,33 @@ body{font-family:'Hanken Grotesk',sans-serif;background:var(--rf);color:var(--tx
 .ft-ed{font-size:11px;color:#7C6A60;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .ft-cmvcel{display:flex;justify-content:flex-end;}
 .ft-acts{display:flex;gap:5px;justify-content:flex-end;}
+/* no desktop o agrupador é invisível pro grid; no celular vira flex (ver @media) */
+.ft-mob{display:contents;}
 .ft-sort{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0 0 10px;}
 .ft-sort-lb{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#A08B7F;}
 .ft-sb{background:#fff;border:1px solid var(--rb);border-radius:50px;padding:5px 12px;font-size:12px;font-weight:600;color:#6B5A52;cursor:pointer;font-family:'Hanken Grotesk',sans-serif;display:inline-flex;align-items:center;gap:4px;}
 .ft-sb.on{background:var(--v);border-color:var(--v);color:#fff;}
+/* CELULAR: a linha vira CARD (regra Lola: nada de tabela espremida).
+   Antes o nome dividia espaço com as etiquetas num grid apertado e era esmagado a zero
+   — a tela mostrava só a etiqueta e o preço, sem o nome do prato. */
 @media(max-width:900px){
-  .ft-hd,.ft-row{grid-template-columns:minmax(0,1fr) 84px 96px auto;}
-  .ft-hd-pv,.ft-pv,.ft-hd-ed,.ft-ed{display:none;}
+  .ft-hd{display:none;}
+  .ft-row{display:block;padding:12px 14px;}
+  .ft-nome{display:block;font-size:15px;margin-bottom:8px;}
+  .ft-nome-t{display:block;white-space:normal;overflow:visible;margin-bottom:5px;}
+  .ft-sel,.ft-rev,.ft-cmvalto{display:inline-flex;margin:0 4px 0 0;}
+  .ft-mob{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap;margin-bottom:10px;}
+  .ft-mob>*{text-align:left!important;}
+  .ft-mob>*::before{display:block;font-size:9px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#A08B7F;font-family:'Hanken Grotesk',sans-serif;margin-bottom:1px;}
+  .ft-mob>.ft-num:first-child::before{content:'Custo/porção';}
+  .ft-pv::before{content:'Preço venda';}
+  .ft-cmvcel{display:block;}
+  .ft-cmvcel::before{content:'CMV';}
+  .ft-cmvcel>div{justify-content:flex-start;}
+  .ft-ed{display:block;font-size:11px;color:#7C6A60;}
+  .ft-ed::before{content:'Editado';}
+  .ft-acts{justify-content:stretch;gap:6px;}
+  .ft-acts .ins-sb{flex:1 1 0;height:38px;}
 }
 .ins-racts{display:flex;gap:5px;justify-content:flex-end;}
 .ins-sb{width:28px;height:28px;border-radius:8px;background:#F7F1EA;border:1px solid var(--rb);color:var(--v);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
@@ -1868,17 +1888,17 @@ function drawFT(w){
     }
     row.appendChild(nome);
 
-    // custo/porção
-    row.appendChild(div('ft-num',[R(x.custo_por_porcao)]));
-    // preço venda
-    const pv=div('ft-num pv'+(semPreco?' vazio':'')); pv.classList.add('ft-pv');
+    /* No desktop estes 4 são colunas do grid (o .ft-mob é display:contents).
+       No celular viram uma linha de valores com rótulo. */
+    const mob=div('ft-mob');
+    mob.appendChild(div('ft-num',[R(x.custo_por_porcao)]));                 // custo/porção
+    const pv=div('ft-num pv ft-pv'+(semPreco?' vazio':''));
     pv.textContent=semPreco?'sem preço':R(x.preco_venda);
-    row.appendChild(pv);
-    // CMV — só bolinha + %, sem texto pendurado
+    mob.appendChild(pv);                                                     // preço venda
     const cmvCel=div('ft-cmvcel'); cmvCel.appendChild(mkCMVCompacto(x.preco_venda,x.custo_por_porcao));
-    row.appendChild(cmvCel);
-    // editado
-    row.appendChild(div('ft-ed',[dataEd?((x.editado_por||'—')+' · '+dataEd):'—']));
+    mob.appendChild(cmvCel);                                                 // CMV
+    mob.appendChild(div('ft-ed',[dataEd?((x.editado_por||'—')+' · '+dataEd):'—']));
+    row.appendChild(mob);
     // ações
     const acts=div('ft-acts');
     acts.appendChild(el('button','ins-sb'+(x.revisar?' warn':''),null,{html:'<i class="ph-duotone ph-warning"></i>',title:x.revisar?(x.revisar_motivo||'Revisar'):'Marcar para revisar',onclick:()=>modalRevisarFicha('ft',x)}));
