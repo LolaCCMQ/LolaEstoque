@@ -109,6 +109,53 @@ body{font-family:'Hanken Grotesk',sans-serif;background:var(--rf);color:var(--tx
 .ft-sel{flex:0 0 auto;font-size:10px;font-weight:800;padding:1px 7px;border-radius:50px;color:#fff;}
 .ft-rev{flex:0 0 auto;display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:1px 7px;border-radius:50px;background:#FBF0DD;color:#9A6B1E;border:1px solid #F1DFB8;cursor:pointer;}
 .ft-cmvalto{flex:0 0 auto;display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:1px 7px;border-radius:50px;background:#FBEAE7;color:#B5302E;border:1px solid #F3D3CE;white-space:nowrap;}
+.ft-pronto{flex:0 0 auto;display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:1px 7px;border-radius:50px;background:#EAF1F7;color:#2C5AA0;border:1px solid #CFDFEE;white-space:nowrap;}
+/* ── RECÁLCULO DE PREÇOS (cascata) ── */
+.csc-res{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+.csc-c{flex:1 1 110px;background:#fff;border:1px solid var(--rb);border-radius:12px;padding:10px 13px;}
+.csc-c b{display:block;font-family:'Fraunces',serif;font-size:26px;font-weight:600;line-height:1.05;}
+.csc-c i{display:block;font-style:normal;font-size:10px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:#A08B7F;margin-top:2px;}
+.csc-exp{font-size:12px;line-height:1.55;color:#7C6A60;margin:0 0 14px;}
+.csc-sec{font-family:'Fraunces',serif;font-size:15px;font-weight:600;color:var(--v);margin:20px 0 8px;display:flex;align-items:center;gap:7px;}
+.csc-sec u{font-family:'Hanken Grotesk',sans-serif;text-decoration:none;font-size:10px;font-weight:800;background:var(--rf);color:#7C6A60;border-radius:50px;padding:2px 8px;}
+.csc-sec.trava{color:#B5302E;}
+.csc-tbl{border:1px solid var(--rb);border-radius:12px;overflow:hidden;background:#fff;}
+.csc-hd,.csc-row{display:grid;grid-template-columns:1fr 86px 86px 112px;gap:8px;align-items:center;padding:8px 12px;}
+.csc-hd{background:var(--rf);font-size:9px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#A08B7F;}
+.csc-hd>*+*,.csc-row>*+*{text-align:right;}
+.csc-row{border-top:1px solid var(--rb);font-size:13px;}
+.csc-nome{font-weight:600;color:var(--tx);}
+.csc-tag{font-size:9px;font-weight:800;text-transform:uppercase;background:#FBF0DD;color:#9A6B1E;border-radius:5px;padding:1px 5px;margin-left:5px;}
+.csc-v{font-variant-numeric:tabular-nums;color:#8A7A72;white-space:nowrap;}
+.csc-v.novo{font-weight:700;font-family:'Fraunces',serif;font-size:14px;}
+.csc-v.novo.sobe{color:#B5302E;}
+.csc-v.novo.desce{color:#2C7A4B;}
+.csc-u{font-size:12px;color:#8A7A72;white-space:nowrap;}
+.csc-d{font-weight:800;font-size:11px;}
+.csc-d.sobe{color:#B5302E;}
+.csc-d.desce{color:#2C7A4B;}
+.csc-cmv{font-weight:700;font-variant-numeric:tabular-nums;}
+.csc-cmv.alto{color:#B5302E;}
+.csc-trv{display:flex;flex-direction:column;gap:8px;}
+.csc-trvi{background:#FDF3F2;border:1px solid #F0D5D3;border-left:3px solid #B5302E;border-radius:10px;padding:10px 12px;}
+.csc-trvn{font-weight:700;font-size:13px;color:var(--tx);}
+.csc-tp{font-size:9px;font-weight:800;text-transform:uppercase;color:#A08B7F;margin-left:4px;}
+.csc-trvm{font-size:12px;line-height:1.5;color:#8A5A56;margin-top:3px;}
+.csc-trvv{font-size:11px;color:#8A7A72;margin-top:4px;}
+.csc-ok{text-align:center;padding:24px 12px;}
+.csc-ok>i{font-size:52px;color:#2C7A4B;}
+.csc-okt{font-family:'Fraunces',serif;font-size:22px;font-weight:600;color:var(--v);margin-top:4px;}
+.csc-okd{font-size:13px;line-height:1.6;color:#7C6A60;margin-top:6px;}
+.csc-okn{font-size:11px;color:#A08B7F;margin-top:14px;}
+@media(max-width:640px){
+  .csc-hd{display:none;}
+  .csc-row{display:block;padding:11px 12px;}
+  .csc-row>*+*{text-align:left;}
+  .csc-nome{margin-bottom:5px;}
+  .csc-v,.csc-u{display:inline-block;margin:0 14px 0 0;}
+  .csc-v::before{content:'hoje ';font-size:9px;font-weight:800;text-transform:uppercase;color:#A08B7F;}
+  .csc-v.novo::before{content:'vira ';}
+}
 .ft-num{text-align:right;font-family:'Fraunces',serif;font-size:15px;font-weight:600;color:var(--v);white-space:nowrap;}
 .ft-num.pv{color:var(--tx);}
 .ft-num.vazio{font-family:'Hanken Grotesk',sans-serif;font-size:11px;font-weight:400;color:#B79A8E;}
@@ -129,7 +176,7 @@ body{font-family:'Hanken Grotesk',sans-serif;background:var(--rf);color:var(--tx
   .ft-row{display:block;padding:12px 14px;}
   .ft-nome{display:block;font-size:15px;margin-bottom:8px;}
   .ft-nome-t{display:block;white-space:normal;overflow:visible;margin-bottom:5px;}
-  .ft-sel,.ft-rev,.ft-cmvalto{display:inline-flex;margin:0 4px 0 0;}
+  .ft-sel,.ft-rev,.ft-cmvalto,.ft-pronto{display:inline-flex;margin:0 4px 0 0;}
   .ft-mob{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap;margin-bottom:10px;}
   .ft-mob>*{text-align:left!important;}
   .ft-mob>*::before{display:block;font-size:9px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#A08B7F;font-family:'Hanken Grotesk',sans-serif;margin-bottom:1px;}
@@ -776,6 +823,7 @@ async function pgIns(c){
         el('button','btn bo bsm',null,{html:'<i class="ph-duotone ph-download-simple"></i> Baixar planilha',onclick:()=>exportInsumosXlsx()}),
         el('button','btn bo bsm',null,{html:'<i class="ph-duotone ph-upload-simple"></i> Conferir preços',onclick:()=>nav('conferencia')}),
         el('button','btn bo bsm',null,{html:'<i class="ph-duotone ph-currency-dollar"></i> Atualizar preços',onclick:()=>modalPrecos()}),
+        el('button','btn bo bsm',null,{html:'<i class="ph-duotone ph-arrows-clockwise"></i> Recalcular receitas',title:'Leva o preço dos insumos até as pré-produções e as fichas. Mostra tudo antes de gravar.',onclick:()=>abrirRecalculo()}),
         el('button','btn bp bsm',null,{html:'<i class="ph-duotone ph-plus"></i> Novo insumo',onclick:()=>modalIns()}),
       ],{style:'flex-wrap:wrap'})
     ]));
@@ -1314,7 +1362,12 @@ function modalPrecos(){
     }
     _ins=await db('lola_insumos','GET',null,'?select=*&ativo=eq.true&order=categoria.asc,nome.asc');
     window._drawIns&&window._drawIns($('#ins-t'));
-    alert('✅ Preços atualizados!');
+    /* Atualizar o preço do insumo NÃO mexe em nenhuma receita sozinho — por isso
+       oferecemos o recálculo aqui, no único momento em que a pessoa sabe que mexeu
+       nos preços. Era a causa de todo mês os preços mudarem e nenhum CMV mudar. */
+    setTimeout(function(){
+      if(confirm('✅ Preços atualizados!\n\nQuer levar esses preços até as receitas agora?\n\nEu mostro tudo que mudaria antes de gravar qualquer coisa.')) abrirRecalculo();
+    },150);
   },'mo mol');
 }
 
@@ -1801,10 +1854,14 @@ const FT_SORTS=[
   {k:'editado',l:'Editado'}
 ];
 function _ftCmv(x){ return (!x.preco_venda||x.preco_venda<=0)?null:(x.custo_por_porcao/x.preco_venda*100); }
+/* Limite de CMV — regra da Bianca (16/07): 50% só pra PRODUTO PRONTO (comprado
+   feito, sem nenhuma manipulação, tipo torta fatiada). Preparo da casa: 30%.
+   Antes o app usava 30% pra tudo e acusava as tortas à toa. */
+function _ftLim(x){ return (x&&x.produto_pronto)?50:30; }
 /* CMV compacto da lista: só bolinha + %. O aviso "revisar ficha" vira etiqueta ao lado do nome. */
-function mkCMVCompacto(preco_venda,custo){
+function mkCMVCompacto(preco_venda,custo,lim){
   if(!preco_venda||preco_venda<=0) return span('ft-num vazio','—');
-  const cmv=custo/preco_venda*100, alto=cmv>30;
+  const cmv=custo/preco_venda*100, alto=cmv>(lim||30);
   return div('fl_ aic gap2',[
     el('span',null,null,{style:'width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0;background:'+(alto?'#B5302E':'#2C7A4B')}),
     el('span','bold',cmv.toFixed(0)+'%',{style:'color:'+(alto?'#B5302E':'var(--vd)')})
@@ -1839,16 +1896,17 @@ function drawFT(w){
 
   const alertas=f.filter(x=>{
     if(!x.preco_venda||x.preco_venda<=0)return false;
-    return x.custo_por_porcao/x.preco_venda*100>30;
+    return x.custo_por_porcao/x.preco_venda*100>_ftLim(x);
   });
   if(alertas.length&&!_ftBusca){
     const alertBox=div('al',null,{style:'background:#FBEAE7;border:1px solid #F3D3CE;color:#B5302E;border-radius:14px;padding:12px 16px;margin-bottom:14px'});
-    alertBox.appendChild(el('div','bold','Revisar ficha técnica - CMV acima de 30%:',{style:'margin-bottom:8px;font-size:13px'}));
+    alertBox.appendChild(el('div','bold','Revisar ficha técnica — CMV acima do limite:',{style:'margin-bottom:2px;font-size:13px'}));
+    alertBox.appendChild(el('div',null,'Preparo da casa: 30%. Produto pronto (comprado feito): 50%.',{style:'margin-bottom:8px;font-size:11px;opacity:.75'}));
     alertas.forEach(x=>{
       const cmv=(x.custo_por_porcao/x.preco_venda*100).toFixed(0);
       alertBox.appendChild(div('fl_ jb aic',[
-        span(null,x.nome,{style:'font-size:12px;font-weight:600'}),
-        span(null,'custo '+R(x.custo_por_porcao)+' venda '+R(x.preco_venda)+' CMV '+cmv+'%',{style:'font-size:11px;opacity:.8'})
+        span(null,x.nome+(x.produto_pronto?' (produto pronto)':''),{style:'font-size:12px;font-weight:600'}),
+        span(null,'custo '+R(x.custo_por_porcao)+' venda '+R(x.preco_venda)+' CMV '+cmv+'% · limite '+_ftLim(x)+'%',{style:'font-size:11px;opacity:.8'})
       ],{style:'padding:4px 0;border-bottom:1px solid #fca5a580'}));
     });
     w.appendChild(alertBox);
@@ -1868,7 +1926,8 @@ function drawFT(w){
     const cmv=semPreco?null:(x.custo_por_porcao/x.preco_venda*100);
     const dataEd=x.editado_em?new Date(x.editado_em).toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}):null;
 
-    const row=div('ft-row'+((!semPreco&&cmv>30)?' alerta':''));
+    const lim=_ftLim(x);
+    const row=div('ft-row'+((!semPreco&&cmv>lim)?' alerta':''));
 
     // ficha: nome + selos + revisar
     const nome=div('ft-nome');
@@ -1881,9 +1940,14 @@ function drawFT(w){
       rv.title=x.revisar_motivo||''; rv.addEventListener('click',()=>modalRevisarFicha('ft',x));
       nome.appendChild(rv);
     }
-    if(!semPreco&&cmv>30){
+    if(x.produto_pronto){
+      const pp=span('ft-pronto'); pp.innerHTML='<i class="ph-duotone ph-package"></i> produto pronto';
+      pp.title='Comprado feito, sem manipulação — o limite de CMV dele é 50%';
+      nome.appendChild(pp);
+    }
+    if(!semPreco&&cmv>lim){
       const rc=span('ft-cmvalto'); rc.innerHTML='<i class="ph-duotone ph-warning-circle"></i> revisar ficha';
-      rc.title='CMV de '+cmv.toFixed(0)+'% — acima dos 30%';
+      rc.title='CMV de '+cmv.toFixed(0)+'% — acima do limite de '+lim+'%'+(x.produto_pronto?' (produto pronto)':' (preparo da casa)');
       nome.appendChild(rc);
     }
     row.appendChild(nome);
@@ -1895,7 +1959,7 @@ function drawFT(w){
     const pv=div('ft-num pv ft-pv'+(semPreco?' vazio':''));
     pv.textContent=semPreco?'sem preço':R(x.preco_venda);
     mob.appendChild(pv);                                                     // preço venda
-    const cmvCel=div('ft-cmvcel'); cmvCel.appendChild(mkCMVCompacto(x.preco_venda,x.custo_por_porcao));
+    const cmvCel=div('ft-cmvcel'); cmvCel.appendChild(mkCMVCompacto(x.preco_venda,x.custo_por_porcao,lim));
     mob.appendChild(cmvCel);                                                 // CMV
     mob.appendChild(div('ft-ed',[dataEd?((x.editado_por||'—')+' · '+dataEd):'—']));
     row.appendChild(mob);
@@ -2141,7 +2205,7 @@ async function modalFicha(item){
   const _tabBeb=(_ftTab||'').indexOf('beb_')===0;
   const _tabCard=_tabBeb?_ftTab.slice(4):(['ccmq','mac','eventos','central'].includes(_ftTab)?_ftTab:'ccmq');
   const _defCat=item?.categoria||(_tabBeb?'bebida':'prato');
-  let f={nome:item?.nome||'',cardapio:item?.cardapio||_tabCard,categoria:_defCat,rendimento_qtd:item?.rendimento_qtd||1,rendimento_un:item?.rendimento_un||'porção',preco_venda:item?.preco_venda||'',meta_cmv:item?.meta_cmv||30,modo_preparo:item?.modo_preparo||'',observacoes:item?.observacoes||'',e_preparo:!!item?.e_preparo};
+  let f={nome:item?.nome||'',cardapio:item?.cardapio||_tabCard,categoria:_defCat,rendimento_qtd:item?.rendimento_qtd||1,rendimento_un:item?.rendimento_un||'porção',preco_venda:item?.preco_venda||'',meta_cmv:item?.meta_cmv||30,modo_preparo:item?.modo_preparo||'',observacoes:item?.observacoes||'',e_preparo:!!item?.e_preparo,produto_pronto:!!item?.produto_pronto};
   // Custo fixo do banco — não zera ao editar preço de venda
   let custoTotalFixo=parseFloat(item?.custo_total||0);
   let custoPorcaoFixo=parseFloat(item?.custo_por_porcao||0);
@@ -2179,10 +2243,11 @@ async function modalFicha(item){
     const cmv=pv>0?(cpp/pv*100):null;
     const meta=parseFloat(f.meta_cmv)||33;
     _precoSug=meta>0?cpp/(meta/100):0;
-    const cmvCor=cmv==null?'':(cmv<=30?'var(--vd)':'#dc2626');
+    const _lim=f.produto_pronto?50:30;
+    const cmvCor=cmv==null?'':(cmv<=_lim?'var(--vd)':'#dc2626');
     custoResEl.innerHTML=somaIngredientesHTML(ings)+'<div class="fl_ jb mb3"><span>Custo total</span><strong>'+R(ct)+'</strong></div>'+
       '<div class="fl_ jb mb3"><span>Custo/porção</span><strong class="tv">'+R(cpp)+'</strong></div>'+
-      (cmv!=null?'<div class="fl_ jb mb3"><span>CMV atual</span><strong style="color:'+cmvCor+'">'+cmv.toFixed(0)+'%</strong></div>':'')+
+      (cmv!=null?'<div class="fl_ jb mb3"><span>CMV atual <span style="font-size:10px;opacity:.6">(limite '+_lim+'%)</span></span><strong style="color:'+cmvCor+'">'+cmv.toFixed(0)+'%</strong></div>':'')+
       '<div class="fl_ jb"><span>Preço sugerido (CMV '+meta+'%)</span><strong class="tv">'+R(_precoSug)+'</strong></div>';
   }
 
@@ -2300,6 +2365,25 @@ async function modalFicha(item){
     wrap.appendChild(txt);wrap.appendChild(sw);
     return wrap;
   })();
+  /* Toggle PRODUTO PRONTO — decide o limite de CMV desta ficha (50% em vez de 30%).
+     Regra da Bianca: 50% só vale pra comprado feito, sem nenhuma manipulação. */
+  const produtoProntoToggle=(()=>{
+    const wrap=div('fl_ aic');
+    wrap.style.cssText='margin-top:4px;padding:12px 14px;background:#fff;border:1.5px solid var(--rb);border-radius:13px;gap:12px;cursor:pointer;user-select:none';
+    const txt=div(null);txt.style.cssText='flex:1';
+    const sw=document.createElement('div');const knob=document.createElement('div');sw.appendChild(knob);
+    function paint(){
+      txt.innerHTML='<div style="font-size:14px;font-weight:800;color:var(--tx)">Produto pronto</div>'
+        +'<div style="font-size:11px;color:#8A7A72">Comprado feito, sem manipulação (ex.: torta fatiada). '
+        +'Limite de CMV: <b>'+(f.produto_pronto?'50%':'30%')+'</b></div>';
+      sw.style.cssText='width:46px;height:26px;border-radius:50px;position:relative;flex-shrink:0;transition:background .15s;background:'+(f.produto_pronto?'var(--v)':'#D9CEC4');
+      knob.style.cssText='width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:3px;transition:left .15s;left:'+(f.produto_pronto?'23px':'3px');
+    }
+    paint();
+    wrap.addEventListener('click',()=>{f.produto_pronto=!f.produto_pronto;paint();calcTotais();});
+    wrap.appendChild(txt);wrap.appendChild(sw);
+    return wrap;
+  })();
 
   let fotos=[]; if(ed && item?.id){ try{ const _fr=await db('lola_fichas_fotos','GET',null,'?ficha_id=eq.'+item.id+'&order=created_at.asc'); fotos=(_fr||[]).map(function(x){return x.foto;}); }catch(e){} }
   const fotosWidget=buildFotosWidget(fotos);
@@ -2325,6 +2409,7 @@ async function modalFicha(item){
       fgrp('Unidade rendimento',fsel('',['porção','un','kg','L','pessoa'],f.rendimento_un,v=>f.rendimento_un=v)),
     ]),
     prePreparoToggle,
+    produtoProntoToggle,
     fgrp('📷 Fotos do prato',fotosWidget),
     el('hr','dv'),
     div('fl_ jb aic mb3',[
@@ -2368,7 +2453,7 @@ async function modalFicha(item){
     const ct2=ings.length>0?ings.reduce((t,ig)=>t+parseFloat(ig.custo_total||0),0):custoTotalFixo;
     const cpp2=ings.length>0?ct2/parseFloat(f.rendimento_qtd||1):custoPorcaoFixo;
     const descricaoEd=document.getElementById('ft-descricao-edicao')?.value||'';
-    const p={nome:f.nome,cardapio:f.cardapio,categoria:f.categoria,destinos:destSelectorFT.getDestinos(),e_preparo:!!f.e_preparo,rendimento_qtd:parseFloat(f.rendimento_qtd),rendimento_un:f.rendimento_un,preco_venda:parseFloat(f.preco_venda)||null,custo_total:ct2,custo_por_porcao:cpp2,modo_preparo:f.modo_preparo||null,observacoes:f.observacoes||null,editado_por:_autorFt.v||null,editado_em:new Date().toISOString()};
+    const p={nome:f.nome,cardapio:f.cardapio,categoria:f.categoria,destinos:destSelectorFT.getDestinos(),e_preparo:!!f.e_preparo,produto_pronto:!!f.produto_pronto,rendimento_qtd:parseFloat(f.rendimento_qtd),rendimento_un:f.rendimento_un,preco_venda:parseFloat(f.preco_venda)||null,custo_total:ct2,custo_por_porcao:cpp2,modo_preparo:f.modo_preparo||null,observacoes:f.observacoes||null,editado_por:_autorFt.v||null,editado_em:new Date().toISOString()};
     let _capa=''; if(typeof fotos!=='undefined' && fotos && fotos.length){ try{ _capa=await _thumbP(fotos[0],320); }catch(e){} } p.capa=_capa;
     let fid;
     if(ed){
@@ -6142,6 +6227,160 @@ function fsel(id,opts,val,onChange,_,attrs){
   arr.forEach(o=>{const op=el('option',null,o.l,{value:o.v});if(o.v===String(val)||o.v===val)op.selected=true;s.appendChild(op);});
   s.addEventListener('change',e=>onChange(e.target.value));return s;
 }
+/* ═══════════ RECÁLCULO DE PREÇOS — a cascata insumo → pré-produção → ficha ═══════════
+   O motor mora no BANCO, não aqui:
+     lola_cascata_calc(limite)      → só lê, devolve o que MUDARIA
+     lola_cascata_aplicar(limite,por) → grava, com backup de tudo
+     lola_cascata_desfazer(exec,por)  → volta ao que era
+   As duas travas moram lá dentro e são aplicadas DURANTE o cálculo, então um
+   preparo reprovado fica congelado e quem usa ele NÃO herda o número podre:
+     1) mudança >= 150%  → não grava (não existe preço que faça isso)
+     2) CMV acima de 100% → não grava (o prato custaria mais do que vende)
+   Passar do limite de 30%/50% NÃO trava: grava e a etiqueta vermelha acusa.  */
+const _CASC_LIM=150;
+let _cascRows=null, _cascExec=null;
+function _cscN(v){const n=parseFloat(v);return isFinite(n)?n:0;}
+function _cscPct(a,b){a=_cscN(a);if(!a)return null;return (_cscN(b)-a)/Math.abs(a)*100;}
+function _cscE(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function _cscPctTxt(p){ if(p==null) return '—'; return (p>0?'+':'')+Math.round(p)+'%'; }
+
+async function abrirRecalculo(){
+  const ov=div('ov'); const mo=div('mo mol');
+  mo.addEventListener('click',e=>e.stopPropagation());
+  ov.addEventListener('click',e=>{ if(e.target===ov) ov.remove(); });
+  mo.appendChild(div('mh',[el('h3',null,'Recalcular receitas'),btn('xb','✕',()=>ov.remove())]));
+  const mb=div('mb');
+  mb.appendChild(div('ld',[div('sp'),document.createTextNode('Refazendo a conta de cada receita com os preços de hoje...')]));
+  mo.appendChild(mb); ov.appendChild(mo); document.body.appendChild(ov);
+  try{
+    const rows=await db('rpc/lola_cascata_calc','POST',{p_limite_pct:_CASC_LIM});
+    _cascRows=rows||[]; _cascExec=null;
+    _cscPrevia(mb,mo,ov);
+  }catch(e){ mb.innerHTML='<p style="color:#B5302E;padding:10px">Não consegui calcular: '+_cscE(e.message)+'</p>'; }
+}
+
+function _cscCard(n,lb,cor){ return '<div class="csc-c"><b style="color:'+cor+'">'+n+'</b><i>'+lb+'</i></div>'; }
+
+function _cscPrevia(mb,mo,ov){
+  const rows=_cascRows||[];
+  const apl=rows.filter(r=>String(r.decisao||'').indexOf('aplicar')===0);
+  const trv=rows.filter(r=>r.decisao==='suspeito'||r.decisao==='bloqueado');
+  const eq =rows.filter(r=>r.decisao==='sem mudanca');
+  const ord=(a,b)=>Math.abs(_cscPct(b.custo_hoje,b.custo_novo)||0)-Math.abs(_cscPct(a.custo_hoje,a.custo_novo)||0);
+  const fA=apl.filter(r=>r.tipo==='ficha').sort(ord);
+  const pA=apl.filter(r=>r.tipo==='pp').sort(ord);
+
+  let h='<div class="csc-res">'
+    + _cscCard(apl.length,'vão ser atualizados','#2C7A4B')
+    + _cscCard(trv.length,'travados pra revisão','#B5302E')
+    + _cscCard(eq.length,'já estão certos','#8A7A72')
+    + '</div>';
+
+  h+='<p class="csc-exp">Refiz a conta de cada receita com o preço de hoje de cada insumo — '
+   + 'inclusive preparo dentro de preparo. Quando o resultado é grande demais pra ser preço '
+   + '(mudança acima de '+_CASC_LIM+'%) '
+   + 'ou faria o prato custar mais do que vende, eu <b>não gravo</b>: o valor fica congelado e a ficha '
+   + 'é etiquetada pra revisão. <b>Nada é aplicado até você clicar no botão lá embaixo.</b></p>';
+
+  if(fA.length) h+=_cscBloco('Pratos',fA,true);
+  if(pA.length) h+=_cscBloco('Pré-produções',pA,false);
+  if(trv.length) h+=_cscTrava(trv);
+  if(eq.length) h+='<p class="csc-exp" style="margin:16px 0 0">E '+eq.length+' receita'+(eq.length>1?'s já estão':' já está')+' com o custo em dia — nessas não mexo.</p>';
+
+  mb.innerHTML=h;
+  _cscFooter(mo,mb,ov,apl.length);
+}
+
+function _cscBloco(tit,list,ehFicha){
+  let h='<div class="csc-sec">'+tit+' <u>'+list.length+'</u></div><div class="csc-tbl">'
+   + '<div class="csc-hd"><div>Nome</div><div>Hoje</div><div>Vira</div><div>'+(ehFicha?'CMV':'Diferença')+'</div></div>';
+  list.forEach(function(r){
+    const sobe=_cscN(r.custo_novo)>_cscN(r.custo_hoje);
+    const dir=sobe?'sobe':'desce';
+    let ult;
+    if(ehFicha && _cscN(r.preco_venda)>0){
+      const lim=_cscN(r.limite_cmv)||30;
+      ult='<span class="csc-cmv">'+Math.round(_cscN(r.cmv_hoje))+'%</span> → '
+        + '<span class="csc-cmv'+(_cscN(r.cmv_novo)>lim?' alto':'')+'">'+Math.round(_cscN(r.cmv_novo))+'%</span>';
+    } else {
+      ult='<span class="csc-d '+dir+'">'+_cscPctTxt(_cscPct(r.custo_hoje,r.custo_novo))+'</span>';
+    }
+    h+='<div class="csc-row">'
+      + '<div class="csc-nome">'+_cscE(r.nome)
+      +   (r.decisao==='aplicar_parcial'?'<span class="csc-tag" title="'+_cscE(r.motivo||'')+'">parcial</span>':'')
+      + '</div>'
+      + '<div class="csc-v">'+R(_cscN(r.unit_hoje))+'</div>'
+      + '<div class="csc-v novo '+dir+'">'+R(_cscN(r.unit_novo))+'</div>'
+      + '<div class="csc-u">'+ult+'</div>'
+      + '</div>';
+  });
+  return h+'</div>';
+}
+
+function _cscTrava(list){
+  let h='<div class="csc-sec trava">Não vou mexer nestes <u>'+list.length+'</u></div>'
+   + '<p class="csc-exp">A conta daria um número que não faz sentido — isso é cadastro errado, não preço. '
+   + 'Ficam com o custo de hoje e etiquetados como <b>REVISAR</b>, com o motivo escrito na ficha. '
+   + 'Quem usa eles também não herda o número ruim.</p><div class="csc-trv">';
+  list.forEach(function(r){
+    h+='<div class="csc-trvi">'
+      + '<div class="csc-trvn">'+_cscE(r.nome)+'<span class="csc-tp">'+(r.tipo==='ficha'?'prato':'preparo')+'</span></div>'
+      + '<div class="csc-trvm">'+_cscE(r.motivo||'')+'</div>'
+      + '<div class="csc-trvv">fica em <b>'+R(_cscN(r.unit_hoje))+'</b>'
+      +   (r.unit_novo!=null?' · a conta daria '+R(_cscN(r.unit_novo)):'')+'</div>'
+      + '</div>';
+  });
+  return h+'</div>';
+}
+
+function _cscFooter(mo,mb,ov,n){
+  const old=mo.querySelector('.mf'); if(old) old.remove();
+  const mf=div('mf',[btn('btn bg','Fechar',()=>ov.remove())]);
+  if(n>0){
+    const ab=btn('btn bp','Atualizar '+n+' receitas',async()=>{
+      ab.textContent='Atualizando...'; ab.disabled=true;
+      try{
+        const r=await db('rpc/lola_cascata_aplicar','POST',{p_limite_pct:_CASC_LIM,p_por:ME||null});
+        const d=Array.isArray(r)?r[0]:r;
+        _cascExec=d&&d.exec_id;
+        _cscFeito(mb,mo,ov,d||{});
+      }catch(e){
+        alert('Não consegui aplicar: '+e.message);
+        ab.textContent='Atualizar '+n+' receitas'; ab.disabled=false;
+      }
+    });
+    mf.appendChild(ab);
+  }
+  mo.appendChild(mf);
+}
+
+function _cscFeito(mb,mo,ov,d){
+  const nf=d.fichas||0, np=d.preparos||0, nq=(d.suspeitos||0)+(d.bloqueados||0);
+  mb.innerHTML='<div class="csc-ok">'
+    + '<i class="ph-duotone ph-check-circle"></i>'
+    + '<div class="csc-okt">Pronto</div>'
+    + '<div class="csc-okd">'+nf+' prato'+(nf===1?'':'s')+' e '+np+' pré-produç'+(np===1?'ão':'ões')+' com o custo em dia.'
+    +   (nq?'<br>'+nq+' ficaram etiquetados como <b>REVISAR</b> — o custo deles não mudou.':'')
+    + '</div>'
+    + '<div class="csc-okn">Se algum número parecer errado, dá pra voltar tudo como estava.</div>'
+    + '</div>';
+  const old=mo.querySelector('.mf'); if(old) old.remove();
+  const mf=div('mf');
+  if(_cascExec){
+    const ub=btn('btn bo','Desfazer tudo',async()=>{
+      if(!confirm('Voltar todos os custos como estavam antes deste recálculo?'))return;
+      ub.textContent='Desfazendo...'; ub.disabled=true;
+      try{
+        await db('rpc/lola_cascata_desfazer','POST',{p_exec:_cascExec,p_por:ME||null});
+        alert('Tudo voltou como estava.'); ov.remove(); nav('insumos');
+      }catch(e){ alert('Erro ao desfazer: '+e.message); ub.textContent='Desfazer tudo'; ub.disabled=false; }
+    });
+    mf.appendChild(ub);
+  }
+  mf.appendChild(btn('btn bp','Fechar',()=>{ov.remove();nav('insumos');}));
+  mo.appendChild(mf);
+}
+
 function mkModal(title,content,onSave,cls){
   const ov=div('ov');
   const mo=div(cls||'mo');
