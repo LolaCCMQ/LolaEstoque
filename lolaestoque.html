@@ -660,18 +660,23 @@ async function renderPage(){
 async function pgDash(c){
   c.appendChild(ld());
   try{
+    /* A Cozinha é a PRIMEIRA tela que abre — se ela mistura, a separação não existe
+       na prática. Filtra pela cozinha do app no próprio banco (`cozinha=in.(...)`),
+       senão os contadores e a lista de "pendentes de revisão" juntam Lola + Central. */
+    const _cozIn='&cozinha=in.('+APP_COZ.join(',')+')';
     const[ai,af,ap,ar,pr,uc,rv_ft,rv_pp,ev]=await Promise.all([
       db('lola_insumos','GET',null,'?select=id&ativo=eq.true'),
-      db('lola_fichas_tecnicas','GET',null,'?select=id&ativo=eq.true'),
+      db('lola_fichas_tecnicas','GET',null,'?select=id&ativo=eq.true'+_cozIn),
       db('lola_pedidos','GET',null,'?select=id&status=in.(em_producao,pronto_entrega)'),
-      db('lola_preproducoes','GET',null,'?select=id&ativo=eq.true'),
+      db('lola_preproducoes','GET',null,'?select=id&ativo=eq.true'+_cozIn),
       db('lola_pedidos','GET',null,'?select=*&status=in.(em_producao,pronto_entrega,solicitado,confirmado)&order=data_pedido.asc'),
       db('lola_contagens','GET',null,'?order=data_contagem.desc&limit=3'),
-      db('lola_fichas_tecnicas','GET',null,'?select=id,nome&ativo=eq.true&revisar=eq.true'),
-      db('lola_preproducoes','GET',null,'?select=id,nome&ativo=eq.true&revisar=eq.true'),
+      db('lola_fichas_tecnicas','GET',null,'?select=id,nome&ativo=eq.true&revisar=eq.true'+_cozIn),
+      db('lola_preproducoes','GET',null,'?select=id,nome&ativo=eq.true&revisar=eq.true'+_cozIn),
       db('lola_central_envio_ccmq','GET',null,'?select=id,descricao,quantidade,unidade,prato,data,responsavel&ativo=neq.false&atendido=eq.false&order=data.desc'),
     ]);
     c.innerHTML='';
+    const _fxd=mkFaixaCozinha(); if(_fxd) c.appendChild(_fxd);
     let fichasEl=null, contagensEl=null;
     const statsEl=div('g3',[
       mkStat('ph-jar','Insumos',ai.length,'ingredientes ativos'),
@@ -1557,8 +1562,11 @@ async function pgPreps(c){
     _ppBusca='';
     const ppSearchEl=mkSearch(q=>{_ppBusca=q;drawPP($('#pp-t'));},'Buscar pré-produção...');
     /* Eventos saiu: não é cozinha, é a Central produzindo (Bianca, 17/07). A aba
-       vivia vazia — nenhuma PP tinha categoria='eventos'. */
-    const ppTabsEl=mkTabs(['todos','ccmq','mac','central'],_ppTab,t=>{_ppTab=t;drawPP($('#pp-t'));},['Tudo','CCMQ','MAC','Central'],true);
+       vivia vazia — nenhuma PP tinha categoria='eventos'.
+       As abas seguem a cozinha do app: a Central não precisa de aba CCMQ/MAC. */
+    const _ppKeys = APP_EH_CENTRAL ? ['todos'] : ['todos','ccmq','mac','central'];
+    const _ppLbls = APP_EH_CENTRAL ? ['Tudo']  : ['Tudo','CCMQ','MAC','Central'];
+    const ppTabsEl=mkTabs(_ppKeys,_ppTab,t=>{_ppTab=t;drawPP($('#pp-t'));},_ppLbls,true);
     const ppBarEsq=div(null);ppBarEsq.style.cssText='display:flex;align-items:center;gap:8px;flex-wrap:wrap;';
     ppBarEsq.appendChild(ppTabsEl);ppBarEsq.appendChild(ppSearchEl);
     const ppBar=div('abar no-print');
@@ -2142,8 +2150,13 @@ async function pgFichas(c){
     c.innerHTML='';
     _ftBusca='';
     const ftSearchEl=mkSearch(q=>{_ftBusca=q;drawFT($('#ft-t'));},'Buscar ficha técnica...');
-    const _ftKeys=['todos','ccmq','beb_ccmq','mac','beb_mac','eventos','beb_eventos'];
-    const _ftLbls=['Tudo','Pratos CCMQ','Bebidas CCMQ','Pratos MAC','Bebidas MAC','Pratos Eventos','Bebidas Eventos'];
+    /* As abas seguem a cozinha do app. No Lola, "Pratos/Bebidas Eventos" viviam
+       vazias (as 17 fichas de evento são feitas na Central); na Central, o
+       contrário. Aba que nunca tem nada só ensina a pessoa a ignorar a tela. */
+    const _ftKeys = APP_EH_CENTRAL ? ['todos','eventos','beb_eventos']
+                                   : ['todos','ccmq','beb_ccmq','mac','beb_mac'];
+    const _ftLbls = APP_EH_CENTRAL ? ['Tudo','Pratos','Bebidas']
+                                   : ['Tudo','Pratos CCMQ','Bebidas CCMQ','Pratos MAC','Bebidas MAC'];
     const _ftCor={ccmq:'#C0392B',beb_ccmq:'#C0392B',mac:'#2C7A4B',beb_mac:'#2C7A4B',eventos:'#9A6B1E',beb_eventos:'#9A6B1E'};
     const _ftDark={};
     let ftTabsEl;
