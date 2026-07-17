@@ -110,6 +110,9 @@ body{font-family:'Hanken Grotesk',sans-serif;background:var(--rf);color:var(--tx
 .ft-rev{flex:0 0 auto;display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:1px 7px;border-radius:50px;background:#FBF0DD;color:#9A6B1E;border:1px solid #F1DFB8;cursor:pointer;}
 .ft-cmvalto{flex:0 0 auto;display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:1px 7px;border-radius:50px;background:#FBEAE7;color:#B5302E;border:1px solid #F3D3CE;white-space:nowrap;}
 .ft-pronto{flex:0 0 auto;display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:1px 7px;border-radius:50px;background:#EAF1F7;color:#2C5AA0;border:1px solid #CFDFEE;white-space:nowrap;}
+/* ── SEPARAÇÃO DAS COZINHAS: faixa + aviso "escondidas" ── */
+.coz-faixa{display:flex;align-items:center;gap:8px;background:#2C5AA0;color:#fff;border-radius:11px;padding:8px 13px;margin-bottom:12px;font-size:12px;font-weight:700;line-height:1.4;}
+.coz-outras{display:flex;align-items:center;gap:9px;flex-wrap:wrap;background:#EAF1F7;border:1px solid #CFDFEE;border-radius:11px;padding:9px 12px;margin-bottom:10px;font-size:12px;color:#2C5AA0;}
 /* ── RECÁLCULO DE PREÇOS (cascata) ── */
 .csc-res{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
 .csc-c{flex:1 1 110px;background:#fff;border:1px solid var(--rb);border-radius:12px;padding:10px 13px;}
@@ -356,6 +359,15 @@ td .sub{font-size:10px;color:var(--ts);margin-top:2px;}
   .topbar{padding:0 12px;height:52px;gap:8px}
   .topbar .logo{height:30px}
   .topbar h1{font-size:14px}
+  /* CABEÇALHO NO CELULAR (17/07): media 411px de conteúdo num tela de 390 — estourava.
+     Some o que é redundante e fica o que importa: o LOGO diz que é o Lola, o SELO diz
+     em que cozinha você está. A palavra "Estoque" e a data são luxo em 390px. */
+  .logo-area{gap:8px;min-width:0}
+  .logo-app,.logo-div{display:none}
+  .topbar-date{display:none}
+  .logo-coz{font-size:10px!important;padding:3px 9px!important;}
+  .coz-faixa-x{display:none}          /* o rabicho da faixa azul não cabe em 390px */
+  .coz-outras .btn{flex:1 1 100%}     /* o botão vira linha inteira, dá pra acertar com o dedo */
   html,body{overflow-x:hidden!important;max-width:100vw}
   .mo,.moxl,.mol{max-width:96vw!important}
   .mo .mb,.mol .mb{overflow-x:hidden}
@@ -1453,9 +1465,12 @@ let _verOutras=false;
    é a sua. Só aparece quando NÃO é o padrão (o Lola), pra não poluir. */
 function mkFaixaCozinha(){
   if(!APP_EH_CENTRAL) return null;
-  const w=div(null);
-  w.style.cssText='display:flex;align-items:center;gap:8px;background:#2C5AA0;color:#fff;border-radius:11px;padding:8px 13px;margin-bottom:12px;font-size:12px;font-weight:700';
-  w.innerHTML='<i class="ph-duotone ph-cooking-pot" style="font-size:16px"></i> Você está na <b style="text-decoration:underline">Cozinha Central</b> — o que criar aqui é da Central';
+  const w=div('coz-faixa');
+  /* flex-wrap + o rabicho "— o que criar aqui é da Central" some no celular:
+     em 390px a frase inteira estourava a faixa. O essencial é "Cozinha Central". */
+  w.innerHTML='<i class="ph-duotone ph-cooking-pot" style="font-size:16px;flex-shrink:0"></i>'
+    +'<span>Você está na <b style="text-decoration:underline">Cozinha Central</b>'
+    +'<span class="coz-faixa-x"> — o que criar aqui é da Central</span></span>';
   return w;
 }
 const COZ_LBL={ccmq:'CCMQ',mac:'MAC',central:'Central'};
@@ -1470,9 +1485,8 @@ function mkCozSelo(coz){
 }
 function mkVerOutras(n,redraw){
   const ondeOutros = 'em outra cozinha';   // são 3 agora — não dá pra dizer "na Central"
-  const w=div(null);
-  w.style.cssText='display:flex;align-items:center;gap:9px;background:#EAF1F7;border:1px solid #CFDFEE;border-radius:11px;padding:9px 12px;margin-bottom:10px;font-size:12px;color:#2C5AA0';
-  w.appendChild(el('span',null,null,{html:'<i class="ph-duotone ph-eye-slash"></i> <b>'+n+'</b> '+(n===1?'é feita':'são feitas')+' '+ondeOutros+' — '+(_verOutras?'aparecendo abaixo':'escondida'+(n===1?'':'s')),style:'flex:1'}));
+  const w=div('coz-outras');   // flex-wrap no celular: o botão desce em vez de espremer o texto
+  w.appendChild(el('span',null,null,{html:'<i class="ph-duotone ph-eye-slash"></i> <b>'+n+'</b> '+(n===1?'é feita':'são feitas')+' '+ondeOutros+' — '+(_verOutras?'aparecendo abaixo':'escondida'+(n===1?'':'s')),style:'flex:1 1 180px;min-width:0'}));
   w.appendChild(btn('btn bo bxs',_verOutras?'Esconder':'Ver assim mesmo',()=>{_verOutras=!_verOutras;redraw();}));
   return w;
 }
