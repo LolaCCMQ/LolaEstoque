@@ -4732,6 +4732,33 @@ async function desfazerEnvio(e){
 ══════════════════════════════════ */
 const EN_CATS=["Insumos Alimentos","Hortifruti","Carnes e Pescados","Não Alcoólicos","Bebidas Alcoólicas","Vinhos","Cervejas","Cafés","Pães","Lojinha","Material de Limpeza","Descartáveis/Embalagens","Material de Expediente e Gráfico","Utensílios e Equipamentos","Gás"];
 const _jnorm=s=>(s==null?'':String(s)).trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ');
+/* ── SUGESTÃO de insumo pra descrição da nota ─────────────────────────────
+   A nota vem escrita do jeito do fornecedor ("BROWNIE", "BATATA BRANCA BICA _ KG")
+   e ninguém sabe qual insumo é. Isto propõe; a pessoa confirma; o de-para fica
+   gravado pra sempre. Mesmo padrão do peso_un_g: propõe, confirma, lembra.
+   NÃO chuta sozinho — só pré-preenche marcado como sugestão.               */
+const _EN_STOP={'de':1,'da':1,'do':1,'com':1,'sem':1,'kg':1,'un':1,'cx':1,'pct':1,'gr':1,'ml':1,'lt':1,'und':1,'para':1,'tipo':1};
+function _enToks(s){
+  return _jnorm(s).split(/[^a-z0-9]+/).filter(t=>t.length>=3 && !_EN_STOP[t] && !/^\d+$/.test(t));
+}
+function _enSugere(desc){
+  const d=' '+_jnorm(desc)+' ';
+  if(!EN||!EN.insumos||d.trim().length<3) return null;
+  let best=null,bestN=0,bestCov=0;
+  EN.insumos.forEach(function(i){
+    const nt=_enToks(i.nome);
+    if(!nt.length) return;
+    let hit=0;
+    nt.forEach(function(t){ if(d.indexOf(' '+t)>=0 || d.indexOf(t+' ')>=0 || d.indexOf(t)>=0) hit++; });
+    if(!hit) return;
+    const cov=hit/nt.length;
+    /* mais tokens casados ganha (mais específico): "Ovo de codorna" > "Ovo"
+       para a descrição "OVO DE CODORNA". Empate: maior cobertura do nome.   */
+    if(hit>bestN || (hit===bestN && cov>bestCov)){ bestN=hit; bestCov=cov; best=i; }
+  });
+  if(!best) return null;
+  return {ins:best, n:bestN, cov:bestCov, forte:(bestN>=2 || bestCov>=0.99)};
+}
 let EN=null,_enComp='';
 function _enMesLbl(m){const M=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];const p=m.split('-');return M[(+p[1])-1]+'/'+p[0].slice(2);}
 function _enQ(q){return N(q,3).replace(/,?0+$/,'')||'0';}
@@ -4741,7 +4768,11 @@ async function pgEntradaNotas(c){
     const [notas,lancadas,mapa,insumos]=await Promise.all([
       db('rpc/ccmq_notas_estoque','POST',{}),
       db('lola_ccmq_estoque_nota','GET',null,'?select=chave'),
-      db('lola_ccmq_estoque_map','GET',null,'?select=desc_norm,insumo_id,fator'),
+      /* mapa UNIFICADO (17/07): antes cada app tinha o seu, com normalização
+         diferente — o Lola gravava 'brownie', a Central 'BROWNIE'. Mesmo dado,
+         chaves incompatíveis: o Lola só reconhecia 15 de 586 itens de junho.
+         Agora são 185 de-paras compartilhados. Ver lola_desc_norm() no banco. */
+      db('lola_nota_insumo_map','GET',null,'?select=desc_norm,insumo_id,fator,ignorar&limit=5000'),
       db('lola_insumos','GET',null,'?select=id,nome,categoria,unidade_compra,unidade_custo,custo_por_unidade&ativo=eq.true&order=nome.asc')
     ]);
     const lanSet=new Set(lancadas.map(x=>x.chave));
@@ -4780,11 +4811,27 @@ function abrirNotaEN(n){
   if(!itens.length)wrap.appendChild(div('tss',['Essa nota não tem itens.']));
   itens.forEach(it=>{
     const desc=it.desc||'';const q=+it.qtd||0;const un=String(it.un||'').toUpperCase();const ct=+it.vtotal||0;
-    const mp=EN.mapByKey[_jnorm(desc)];let insNome='',fator=1;
+    const mp=EN.mapByKey[_jnorm(desc)];let insNome='',fator=1,_sug=null;
     if(mp&&EN.insById[mp.insumo_id]){insNome=EN.insById[mp.insumo_id].nome;fator=+mp.fator||1;}
-    const rw=div(null);rw.style.cssText='border:1px solid var(--rb);border-radius:12px;padding:10px 12px;margin-bottom:8px;background:var(--rf)';
-    rw.innerHTML='<div style="font-weight:700;font-size:13px;color:var(--tx)">'+_envEsc(desc)+'</div><div style="font-size:11px;color:var(--ts);margin-bottom:6px">nota: '+_enQ(q)+' '+_envEsc(un)+' · '+R(ct)+'</div>';
+    /* Propõe, mas só PRÉ-PREENCHE o palpite forte. O fraco fica como dica clicável:
+       "CHOPEIRA ELET AMSTEL" sugeria "Amstel Ultra" (errado) — pré-preenchido, alguém
+       salvaria no automático. Palpite fraco tem que exigir um clique consciente. */
+    else{ _sug=_enSugere(desc); if(_sug && _sug.forte) insNome=_sug.ins.nome; }
+    const rw=div(null);rw.style.cssText='border:1px solid var(--rb);border-radius:12px;padding:10px 12px;margin-bottom:8px;background:'+(_sug?'#FFFBF3':'var(--rf)')+(_sug?';border-color:#F1DFB8':'');
+    const _sl='font-size:9px;font-weight:800;padding:1px 6px;border-radius:5px;text-transform:uppercase;letter-spacing:.4px';
+    const selo = mp ? '<span style="background:#DCFCE7;color:#166534;'+_sl+'">já conhecido</span>'
+              : (_sug&&_sug.forte) ? '<span style="background:#FBF0DD;color:#9A6B1E;'+_sl+'">sugestão — confira</span>'
+              : '<span style="background:#F3EEE9;color:#8A7A72;'+_sl+'">não sei o que é</span>';
+    rw.innerHTML='<div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap"><span style="font-weight:700;font-size:13px;color:var(--tx)">'+_envEsc(desc)+'</span>'+selo+'</div><div style="font-size:11px;color:var(--ts);margin-bottom:6px">nota: '+_enQ(q)+' '+_envEsc(un)+' · '+R(ct)+'</div>';
     const insInp=el('input','fi',null,{list:'enInsList',placeholder:'Insumo (busque ou crie novo)',value:insNome,autocomplete:'off'});insInp.style.cssText='width:100%;margin-bottom:6px;font-size:13px';
+    if(_sug && !_sug.forte){   // palpite fraco: dica, não preenchimento
+      const dica=el('div',null,null,{style:'font-size:11px;color:#9A6B1E;margin:-2px 0 6px'});
+      const lk=el('span',null,_sug.ins.nome,{style:'text-decoration:underline;cursor:pointer;font-weight:700'});
+      lk.addEventListener('click',()=>{insInp.value=_sug.ins.nome;insInp.dispatchEvent(new Event('input'));dica.remove();});
+      dica.appendChild(document.createTextNode('será que é '));dica.appendChild(lk);
+      dica.appendChild(document.createTextNode('? (palpite fraco — só clique se for)'));
+      rw.appendChild(dica);
+    }
     const fatInp=el('input','fi',null,{type:'number',step:'0.0001',value:fator,inputmode:'decimal'});fatInp.style.cssText='width:88px;text-align:center';
     const calc=el('span','tss');
     const novoBox=div(null);novoBox.style.cssText='display:none;gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center';
@@ -4824,7 +4871,7 @@ async function lancarNotaEN(n,rows,bSave){
       }
       const f=+r.fatInp.value||1,qu=r.q*f,cu=qu>0?r.ct/qu:0,unUso=ins.unidade_custo||r.unInp.value||r.un||'un';
       await db('lola_ccmq_estoque_mov','POST',{insumo_id:ins.id,tipo:'entrada',qtd:qu,unidade:unUso,custo_unit:cu,custo_total:r.ct,origem_tipo:'nota',origem_ref:n.chave,data:hoje,criado_por:quem});
-      await fetch(SB+'/rest/v1/lola_ccmq_estoque_map?on_conflict=desc_norm',{method:'POST',headers:H,body:JSON.stringify({desc_norm:_jnorm(r.desc),insumo_id:ins.id,fator:f})});
+      await fetch(SB+'/rest/v1/lola_nota_insumo_map?on_conflict=desc_norm',{method:'POST',headers:H,body:JSON.stringify({desc_norm:_jnorm(r.desc),desc_orig:r.desc,insumo_id:ins.id,fator:f,origem:'ccmq',criado_por:ME||null,updated_at:new Date().toISOString()})});
       if(cu>0)await db('lola_insumos','PATCH',{custo_por_unidade:cu},'?id=eq.'+ins.id);
     }
     await fetch(SB+'/rest/v1/lola_ccmq_estoque_nota?on_conflict=chave',{method:'POST',headers:H,body:JSON.stringify({chave:n.chave})});
