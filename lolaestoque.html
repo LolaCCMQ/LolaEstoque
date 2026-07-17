@@ -1424,17 +1424,25 @@ let _ppTab='todos',_ppBusca='';
    sem precisar do link. Quando o login amarrar a unidade, isto vira só o padrão. */
 const COZ_NOME={ccmq:'Cozinha CCMQ',mac:'Cozinha MAC',central:'Cozinha Central'};
 const APP_COZ_ID=(function(){
+  var ok=function(x){ return x==='ccmq'||x==='mac'||x==='central'; };
+  /* 1º) a URL manda. NÃO grava na memória — senão o iframe da Central (que abre com
+     ?unidade=central) contaminava o app do Lola: a Bianca entrava pelo link do Lola
+     e caía na Cozinha Central (17/07). Só a escolha CONSCIENTE no seletor gruda. */
   var u='';
   try{ u=(new URLSearchParams(location.search).get('unidade')||'').trim().toLowerCase(); }catch(_){}
-  if(!u){ try{ u=(localStorage.getItem('lola_cozinha')||'').trim().toLowerCase(); }catch(_){} }
-  if(u!=='ccmq'&&u!=='mac'&&u!=='central') u='ccmq';   // padrão: a maior (77 fichas, 543 notas)
-  try{ localStorage.setItem('lola_cozinha',u); }catch(_){}
-  return u;
+  if(ok(u)) return u;
+  /* 2º) a escolha da pessoa no seletor.
+     Chave v2: a v1 ficou envenenada com 'central' nos navegadores que abriram o app
+     da Central antes do conserto. Trocar a chave zera todo mundo sem pedir nada. */
+  try{ localStorage.removeItem('lola_cozinha'); }catch(_){}
+  try{ var s=(localStorage.getItem('lola_cozinha_v2')||'').trim().toLowerCase(); if(ok(s)) return s; }catch(_){}
+  // 3º) padrão: a maior (77 fichas, 543 das 779 notas)
+  return 'ccmq';
 })();
 const APP_COZ=[APP_COZ_ID];
 const APP_EH_CENTRAL = APP_COZ_ID==='central';
 function trocarCozinha(id){
-  try{ localStorage.setItem('lola_cozinha',id); }catch(_){}
+  try{ localStorage.setItem('lola_cozinha_v2',id); }catch(_){}   // só o seletor grava
   var q=new URLSearchParams(location.search); q.set('unidade',id);
   location.search=q.toString();          // recarrega inteiro: mais seguro que remendar o estado
 }
