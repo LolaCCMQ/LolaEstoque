@@ -593,11 +593,17 @@ const LOGO_SVG=`<?xml version="1.0" encoding="utf-8"?>
      cabeçalho dizia só "Estoque" em todas. Agora o nome da cozinha fica no topo,
      na aba do navegador e (em modo não-padrão) numa faixa colorida. */
   const tbLeft=div('logo-area',[div('logo-svg-wrap',null,{html:LOGO_SVG}),div('logo-div'),span('logo-app','Estoque')]);
-  const _cozNome=APP_EH_CENTRAL?'Cozinha Central':(APP_COZ.length===1&&APP_COZ[0]==='mac')?'Cozinha MAC':(APP_COZ.length===1&&APP_COZ[0]==='ccmq')?'Cozinha CCMQ':'Lola — CCMQ e MAC';
-  const _cozCor=APP_EH_CENTRAL?'#2C5AA0':(APP_COZ.length===1&&APP_COZ[0]==='mac')?'#2C7A4B':'#C0392B';
+  const _cozNome=COZ_NOME[APP_COZ_ID]||'Estoque';
   const tbCoz=span('logo-coz',_cozNome);
-  tbCoz.style.cssText='margin-left:10px;font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#fff;background:'+_cozCor+';border-radius:50px;padding:3px 11px;white-space:nowrap';
+  tbCoz.style.cssText='margin-left:10px;font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#fff;background:'+(COZ_COR[APP_COZ_ID]||'#888')+';border-radius:50px;padding:3px 11px;white-space:nowrap;cursor:pointer';
+  tbCoz.title='Trocar de cozinha';
+  tbCoz.addEventListener('click',abrirTrocaCozinha);
   tbLeft.appendChild(tbCoz);
+  /* Seta discreta: sem ela ninguém descobre que o selo é clicável. */
+  const _cozSeta=span(null,null,{html:'<i class="ph-bold ph-caret-down"></i>'});
+  _cozSeta.style.cssText='margin-left:5px;color:#A08B7F;font-size:11px;cursor:pointer';
+  _cozSeta.addEventListener('click',abrirTrocaCozinha);
+  tbLeft.appendChild(_cozSeta);
   try{ document.title=_cozNome+' — Estoque Lola'; }catch(_){}
   const tbRight=span('topbar-date',new Date().toLocaleDateString('pt-BR',{weekday:'short',day:'numeric',month:'short'}));
   const tb=div('topbar',[hamBtn,tbLeft,tbRight]);
@@ -1400,16 +1406,47 @@ let _ppTab='todos',_ppBusca='';
    MESMO arquivo serve os dois: o portal abre sem parâmetro (= Lola: ccmq+mac) e
    o app da Central abre esta tela por iframe com ?unidade=central.
    Um app, dois modos — sem copiar o editor de ficha (450 linhas) pra lugar nenhum. */
-const APP_COZ=(function(){
-  try{
-    var u=(new URLSearchParams(location.search).get('unidade')||'').trim().toLowerCase();
-    if(u==='central') return ['central'];
-    if(u==='mac')     return ['mac'];
-    if(u==='ccmq')    return ['ccmq'];
-  }catch(_){}
-  return ['ccmq','mac'];          // padrão: o app do Lola
+/* Três cozinhas de verdade: CCMQ · MAC · Central (Bianca, 17/07).
+   Como o portal abre o Estoque sem dizer quem é a pessoa, a cozinha vem da URL
+   e fica trocável pelo selo do topo. Guarda a escolha, então cada um abre na sua
+   sem precisar do link. Quando o login amarrar a unidade, isto vira só o padrão. */
+const COZ_NOME={ccmq:'Cozinha CCMQ',mac:'Cozinha MAC',central:'Cozinha Central'};
+const APP_COZ_ID=(function(){
+  var u='';
+  try{ u=(new URLSearchParams(location.search).get('unidade')||'').trim().toLowerCase(); }catch(_){}
+  if(!u){ try{ u=(localStorage.getItem('lola_cozinha')||'').trim().toLowerCase(); }catch(_){} }
+  if(u!=='ccmq'&&u!=='mac'&&u!=='central') u='ccmq';   // padrão: a maior (77 fichas, 543 notas)
+  try{ localStorage.setItem('lola_cozinha',u); }catch(_){}
+  return u;
 })();
-const APP_EH_CENTRAL = APP_COZ.length===1 && APP_COZ[0]==='central';
+const APP_COZ=[APP_COZ_ID];
+const APP_EH_CENTRAL = APP_COZ_ID==='central';
+function trocarCozinha(id){
+  try{ localStorage.setItem('lola_cozinha',id); }catch(_){}
+  var q=new URLSearchParams(location.search); q.set('unidade',id);
+  location.search=q.toString();          // recarrega inteiro: mais seguro que remendar o estado
+}
+function abrirTrocaCozinha(){
+  const ov=div('ov'); const mo=div('mo');
+  mo.addEventListener('click',e=>e.stopPropagation());
+  ov.addEventListener('click',e=>{ if(e.target===ov) ov.remove(); });
+  mo.appendChild(div('mh',[el('h3',null,'Em que cozinha você está?'),btn('xb','✕',()=>ov.remove())]));
+  const mb=div('mb');
+  mb.appendChild(el('p','al ali','Cada cozinha tem os seus insumos, as suas pré-produções e as suas fichas. Você vê só o que é da cozinha escolhida.'));
+  ['ccmq','mac','central'].forEach(function(id){
+    const b=div(null);
+    const eh=(id===APP_COZ_ID);
+    b.style.cssText='display:flex;align-items:center;gap:11px;padding:13px 15px;margin-bottom:8px;border-radius:13px;cursor:pointer;border:2px solid '+(eh?COZ_COR[id]:'var(--rb)')+';background:'+(eh?COZ_COR[id]+'0F':'#fff');
+    b.innerHTML='<span style="width:11px;height:11px;border-radius:50%;flex-shrink:0;background:'+COZ_COR[id]+'"></span>'
+      +'<b style="flex:1;font-size:14px;color:var(--tx)">'+COZ_NOME[id]+'</b>'
+      +(eh?'<span style="font-size:10px;font-weight:800;text-transform:uppercase;color:'+COZ_COR[id]+'">você está aqui</span>':'');
+    if(!eh) b.addEventListener('click',()=>trocarCozinha(id));
+    mb.appendChild(b);
+  });
+  mo.appendChild(mb);
+  mo.appendChild(div('mf',[btn('btn bg','Fechar',()=>ov.remove())]));
+  ov.appendChild(mo); document.body.appendChild(ov);
+}
 let _verOutras=false;
 /* Faixa fixa dizendo em que cozinha a pessoa está. O mesmo arquivo serve as duas
    e as telas são idênticas — sem isto, alguém edita a ficha da outra achando que
@@ -1432,7 +1469,7 @@ function mkCozSelo(coz){
   return s;
 }
 function mkVerOutras(n,redraw){
-  const ondeOutros = APP_EH_CENTRAL ? 'no Lola' : 'na Central';
+  const ondeOutros = 'em outra cozinha';   // são 3 agora — não dá pra dizer "na Central"
   const w=div(null);
   w.style.cssText='display:flex;align-items:center;gap:9px;background:#EAF1F7;border:1px solid #CFDFEE;border-radius:11px;padding:9px 12px;margin-bottom:10px;font-size:12px;color:#2C5AA0';
   w.appendChild(el('span',null,null,{html:'<i class="ph-duotone ph-eye-slash"></i> <b>'+n+'</b> '+(n===1?'é feita':'são feitas')+' '+ondeOutros+' — '+(_verOutras?'aparecendo abaixo':'escondida'+(n===1?'':'s')),style:'flex:1'}));
@@ -1571,12 +1608,10 @@ async function pgPreps(c){
     c.innerHTML='';
     _ppBusca='';
     const ppSearchEl=mkSearch(q=>{_ppBusca=q;drawPP($('#pp-t'));},'Buscar pré-produção...');
-    /* Eventos saiu: não é cozinha, é a Central produzindo (Bianca, 17/07). A aba
-       vivia vazia — nenhuma PP tinha categoria='eventos'.
-       As abas seguem a cozinha do app: a Central não precisa de aba CCMQ/MAC. */
-    const _ppKeys = APP_EH_CENTRAL ? ['todos'] : ['todos','ccmq','mac','central'];
-    const _ppLbls = APP_EH_CENTRAL ? ['Tudo']  : ['Tudo','CCMQ','MAC','Central'];
-    const ppTabsEl=mkTabs(_ppKeys,_ppTab,t=>{_ppTab=t;drawPP($('#pp-t'));},_ppLbls,true);
+    /* Sem abas de cozinha: o APP já É uma cozinha (o seletor do topo troca).
+       Antes elas filtravam por `categoria`, com 2 furos: as 26 de 'todos'/'bebida'
+       não caíam em aba nenhuma, e a aba Eventos vivia vazia. */
+    const ppTabsEl=mkTabs(['todos','pre'],_ppTab,t=>{_ppTab=t;drawPP($('#pp-t'));},['Tudo','Pré-preparos'],true);
     const ppBarEsq=div(null);ppBarEsq.style.cssText='display:flex;align-items:center;gap:8px;flex-wrap:wrap;';
     ppBarEsq.appendChild(ppTabsEl);ppBarEsq.appendChild(ppSearchEl);
     const ppBar=div('abar no-print');
@@ -2160,14 +2195,12 @@ async function pgFichas(c){
     c.innerHTML='';
     _ftBusca='';
     const ftSearchEl=mkSearch(q=>{_ftBusca=q;drawFT($('#ft-t'));},'Buscar ficha técnica...');
-    /* As abas seguem a cozinha do app. No Lola, "Pratos/Bebidas Eventos" viviam
-       vazias (as 17 fichas de evento são feitas na Central); na Central, o
-       contrário. Aba que nunca tem nada só ensina a pessoa a ignorar a tela. */
-    const _ftKeys = APP_EH_CENTRAL ? ['todos','eventos','beb_eventos']
-                                   : ['todos','ccmq','beb_ccmq','mac','beb_mac'];
-    const _ftLbls = APP_EH_CENTRAL ? ['Tudo','Pratos','Bebidas']
-                                   : ['Tudo','Pratos CCMQ','Bebidas CCMQ','Pratos MAC','Bebidas MAC'];
-    const _ftCor={ccmq:'#C0392B',beb_ccmq:'#C0392B',mac:'#2C7A4B',beb_mac:'#2C7A4B',eventos:'#9A6B1E',beb_eventos:'#9A6B1E'};
+    /* As abas seguem a cozinha do app — aba que nunca tem nada só ensina a pessoa
+       a ignorar a tela. A Central vende por Eventos (é o cardapio dela). */
+    const _ftCard = APP_EH_CENTRAL ? 'eventos' : APP_COZ_ID;
+    const _ftKeys = ['todos', _ftCard, 'beb_'+_ftCard];
+    const _ftLbls = ['Tudo','Pratos','Bebidas'];
+    const _ftCor={ccmq:'#C0392B',beb_ccmq:'#C0392B',mac:'#2C7A4B',beb_mac:'#2C7A4B',eventos:'#2C5AA0',beb_eventos:'#2C5AA0'};
     const _ftDark={};
     let ftTabsEl;
     function _paintBebTabs(){if(!ftTabsEl)return;ftTabsEl.querySelectorAll('.tp').forEach((tp,i)=>{const k=_ftKeys[i];const cor=_ftCor[k];if(!cor)return;if(tp.classList.contains('active')){tp.style.background=cor;tp.style.color=_ftDark[k]?'#3a2e00':'#fff';tp.style.borderColor=cor;}else{tp.style.background='#fff';tp.style.color=cor;tp.style.borderColor=cor;}});}
