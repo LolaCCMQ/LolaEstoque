@@ -1487,7 +1487,10 @@ function abrirTrocaCozinha(){
    ⚠️ Isto é tudo de LISTA. `_pp`/`_ft` globais continuam completos — o editor precisa
    do PP Requeijão (Central) pra montar o Brie, e o catálogo de Pedidos precisa do que
    a Central faz. Filtrar global quebra a ficha (é a regra #6). */
-const COZ_LBL={ccmq:'CCMQ',mac:'MAC',central:'Central'};
+/* COZ_COR pinta o selo da cozinha no CABEÇALHO (buildShell) e os cards do seletor de
+   cozinha. NÃO é dos selos dos cards de receita. Apaguei junto com os selos e o app
+   abriu EM BRANCO — "COZ_COR is not defined". Um nome pode servir a dois donos. */
+const COZ_COR={ccmq:'#C0392B',mac:'#2C7A4B',central:'#2C5AA0'};
 function _daMinhaCozinha(x){ return !x.cozinha || APP_COZ.indexOf(x.cozinha)>=0; }
 /* "Pra onde vende": os destinos tirando a própria cozinha (esse é uso interno, não
    venda). Eventos nunca sai — não é cozinha, é a Central produzindo pra evento. */
