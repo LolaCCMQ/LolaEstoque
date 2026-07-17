@@ -1484,11 +1484,16 @@ function mkFaixaCozinha(){
 const COZ_LBL={ccmq:'CCMQ',mac:'MAC',central:'Central'};
 const COZ_COR={ccmq:'#C0392B',mac:'#2C7A4B',central:'#2C5AA0'};
 function _daMinhaCozinha(x){ return !x.cozinha || APP_COZ.indexOf(x.cozinha)>=0; }
+/* Selo de QUEM FAZ. Só aparece quando a receita é de OUTRA cozinha — dentro do app
+   todas são da mesma, e o selo só repetia o que o cabeçalho já diz. Pior: ficava
+   colado no selo de DESTINO ("CENTRAL" × "Central"), e a Bianca achou que as receitas
+   estavam duplicadas e quase apagou as da Central (17/07). Um selo que confunde é pior
+   que selo nenhum. */
 function mkCozSelo(coz){
-  if(!coz) return null;
+  if(!coz || _daMinhaCozinha({cozinha:coz})) return null;
   const s=span('coz-selo',COZ_LBL[coz]||coz);
   s.style.cssText='flex:0 0 auto;font-size:9px;font-weight:800;padding:1px 7px;border-radius:50px;color:#fff;text-transform:uppercase;letter-spacing:.4px;background:'+(COZ_COR[coz]||'#888');
-  s.title='Quem faz: '+(COZ_LBL[coz]||coz);
+  s.title='Feita na '+(COZ_LBL[coz]||coz)+' — não é da sua cozinha';
   return s;
 }
 function mkVerOutras(n,redraw){
@@ -5264,7 +5269,7 @@ async function verResumoCategorias(label, pedidos){
 
 async function modalNovoPedido(){
   // Sempre recarregar para ter destinos atualizados
-  _pp=await db('lola_preproducoes','GET',null,'?select=id,nome,categoria,rendimento_qtd,rendimento_un,porcao_qtd,porcao_un,custo_total,custo_por_unidade,valor_venda_central,margem_venda,destinos,e_preparo&ativo=eq.true&order=nome.asc');
+  _pp=await db('lola_preproducoes','GET',null,'?select=id,nome,categoria,cozinha,rendimento_qtd,rendimento_un,porcao_qtd,porcao_un,custo_total,custo_por_unidade,valor_venda_central,margem_venda,destinos,e_preparo&ativo=eq.true&order=nome.asc');
   _ins=await db('lola_insumos','GET',null,'?select=id,nome,categoria,unidade_compra,unidade_custo,custo_por_unidade,destinos&ativo=eq.true&order=nome.asc');
   const ftPre=await db('lola_fichas_tecnicas','GET',null,'?select=id,nome,custo_por_porcao,rendimento_un,e_preparo&ativo=eq.true&e_preparo=eq.true&order=nome.asc');
   const _invAll=await db('lola_inv_itens','GET',null,'?select=id,nome,categoria,unidade&ativo=neq.false&order=nome.asc').catch(()=>[]);
@@ -5369,8 +5374,14 @@ async function modalNovoPedido(){
   function buildItens(){
     itensArea.innerHTML='';
 
-    // Pedido à central: pré-preparos + marcados destino "central"; insumos da unidade + destino "central"
-    const ppDest=_pp.filter(x=>(x.e_preparo||(x.destinos||[]).includes('central'))&&
+    /* O catálogo do pedido é QUEM A CENTRAL FAZ — regra da Bianca (17/07):
+       "se a central produz, aparece na lista de produções que a gente pode comprar dela".
+       Antes era `e_preparo || destinos.includes('central')`, e isso tinha um FURO:
+       pré-produção nova cadastrada na Central, sem marcar pré-preparo e sem destino,
+       NÃO aparecia aqui — o Lola não conseguia pedir.
+       Fallback pro critério antigo só pras que ainda não têm cozinha (legado). */
+    const ppDest=_pp.filter(x=>(x.cozinha ? x.cozinha==='central'
+                                          : (x.e_preparo||(x.destinos||[]).includes('central')))&&
       (!_buscaNovoPed||x.nome.toLowerCase().includes(_buscaNovoPed)));
     const ftDest=ftPre.filter(x=>(!_buscaNovoPed||x.nome.toLowerCase().includes(_buscaNovoPed)));
     // Sem busca: só os insumos marcados p/ a unidade/central. Com busca: QUALQUER insumo do catálogo
