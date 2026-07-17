@@ -1375,6 +1375,31 @@ function modalPrecos(){
    PRÉ-PRODUÇÕES — ficha técnica completa
 ══════════════════════════════════ */
 let _ppTab='todos',_ppBusca='';
+/* ══ SEPARAÇÃO DAS COZINHAS (17/07) ══════════════════════════════════════
+   Este app é o do LOLA: mostra CCMQ e MAC. O da Central (adm/central-estoque)
+   mostra as dela. `cozinha` = QUEM FAZ (um valor); `destinos` = QUEM USA (vários).
+   ⚠️ O filtro vale SÓ NA LISTA. O `_pp` global continua completo, senão o editor
+   de ficha não acha o PP Requeijão (da Central) pra botar no Brie, e a ficha quebra.
+   Some quando o pedido virar insumo do Lola (passo 4).                        */
+const APP_COZ=['ccmq','mac'];
+let _verOutras=false;
+const COZ_LBL={ccmq:'CCMQ',mac:'MAC',central:'Central'};
+const COZ_COR={ccmq:'#C0392B',mac:'#2C7A4B',central:'#2C5AA0'};
+function _daMinhaCozinha(x){ return !x.cozinha || APP_COZ.indexOf(x.cozinha)>=0; }
+function mkCozSelo(coz){
+  if(!coz) return null;
+  const s=span('coz-selo',COZ_LBL[coz]||coz);
+  s.style.cssText='flex:0 0 auto;font-size:9px;font-weight:800;padding:1px 7px;border-radius:50px;color:#fff;text-transform:uppercase;letter-spacing:.4px;background:'+(COZ_COR[coz]||'#888');
+  s.title='Quem faz: '+(COZ_LBL[coz]||coz);
+  return s;
+}
+function mkVerOutras(n,redraw){
+  const w=div(null);
+  w.style.cssText='display:flex;align-items:center;gap:9px;background:#EAF1F7;border:1px solid #CFDFEE;border-radius:11px;padding:9px 12px;margin-bottom:10px;font-size:12px;color:#2C5AA0';
+  w.appendChild(el('span',null,null,{html:'<i class="ph-duotone ph-eye-slash"></i> <b>'+n+'</b> '+(n===1?'é feita':'são feitas')+' na Central — '+(_verOutras?'aparecendo abaixo':'escondida'+(n===1?'':'s')),style:'flex:1'}));
+  w.appendChild(btn('btn bo bxs',_verOutras?'Esconder':'Ver assim mesmo',()=>{_verOutras=!_verOutras;redraw();}));
+  return w;
+}
 
 
 function editarDestinosPP(pp, onSave){
@@ -1409,7 +1434,17 @@ function editarDestinosPP(pp, onSave){
 
 function drawPP(w){
   w.innerHTML='';
-  let f=_ppTab==='todos'?[..._pp]:_ppTab==='pre'?_pp.filter(p=>p.e_preparo):_pp.filter(p=>p.categoria===_ppTab);
+  /* Abas agora por COZINHA, não por `categoria`. A categoria tinha 2 furos:
+     as 26 de 'todos'/'bebida' não caíam em aba nenhuma (só em Tudo), e a aba
+     Eventos vivia vazia (nenhuma PP tinha essa categoria). */
+  let f=_ppTab==='todos'?[..._pp]
+       :_ppTab==='pre'?_pp.filter(p=>p.e_preparo)
+       :_pp.filter(p=>p.cozinha===_ppTab);
+  const _fora=f.filter(p=>!_daMinhaCozinha(p)).length;
+  if(_ppTab==='todos'||_ppTab==='pre'){                 // nas abas de cozinha, respeita a escolha
+    if(_fora && !_verOutras) f=f.filter(_daMinhaCozinha);
+    if(_fora) w.appendChild(mkVerOutras(_fora,()=>drawPP(w)));
+  }
   if(_ppBusca) f=f.filter(p=>p.nome.toLowerCase().includes(_ppBusca.toLowerCase()));
   if(!f.length){w.appendChild(em('pp',_ppBusca?'Nenhuma pre-producao encontrada':'Nenhuma para esta aba'));return;}
 
@@ -1428,6 +1463,11 @@ function drawPP(w){
     const nomeWrap=document.createElement('div');nomeWrap.style.cssText='margin-bottom:6px';
     const nomeStrong=document.createElement('strong');nomeStrong.style.cssText='font-size:14px';nomeStrong.textContent=p.nome;
     nomeWrap.appendChild(nomeStrong);
+    /* QUEM FAZ — o selo existe pra Bianca conferir a etiqueta antes de a gente
+       esconder qualquer coisa. Não confundir com os selos de DESTINO abaixo,
+       que dizem quem USA. */
+    const _cs=mkCozSelo(p.cozinha);
+    if(_cs){ _cs.style.marginLeft='6px'; nomeWrap.appendChild(_cs); }
     if(p.revisar){
       const rv2=document.createElement('span');rv2.style.cssText='margin-left:6px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:50px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;cursor:pointer';
       rv2.textContent='\u26A0\uFE0F revisar';rv2.title=p.revisar_motivo||'';
@@ -1491,7 +1531,9 @@ async function pgPreps(c){
     c.innerHTML='';
     _ppBusca='';
     const ppSearchEl=mkSearch(q=>{_ppBusca=q;drawPP($('#pp-t'));},'Buscar pré-produção...');
-    const ppTabsEl=mkTabs(['todos','central','mac','ccmq','eventos'],_ppTab,t=>{_ppTab=t;drawPP($('#pp-t'));},['Tudo','Central','MAC','CCMQ','Eventos'],true);
+    /* Eventos saiu: não é cozinha, é a Central produzindo (Bianca, 17/07). A aba
+       vivia vazia — nenhuma PP tinha categoria='eventos'. */
+    const ppTabsEl=mkTabs(['todos','ccmq','mac','central'],_ppTab,t=>{_ppTab=t;drawPP($('#pp-t'));},['Tudo','CCMQ','MAC','Central'],true);
     const ppBarEsq=div(null);ppBarEsq.style.cssText='display:flex;align-items:center;gap:8px;flex-wrap:wrap;';
     ppBarEsq.appendChild(ppTabsEl);ppBarEsq.appendChild(ppSearchEl);
     const ppBar=div('abar no-print');
@@ -1882,6 +1924,12 @@ function drawFT(w){
     _ftTab==='pre'?_ft.filter(x=>x.categoria==='pre'||x.categoria==='pre-producao'):
     _ftTab.indexOf('beb_')===0?_ft.filter(x=>x.cardapio===_ftTab.slice(4)&&x.categoria==='bebida'):
     _ft.filter(x=>x.cardapio===_ftTab&&x.categoria!=='bebida');
+  /* Este app é o do Lola: as fichas feitas na Central (cardapio=eventos) ficam
+     escondidas por padrão, com escape. Filtro SÓ na lista — o `_ft` global segue
+     inteiro pra não quebrar nada que dependa dele. */
+  const _ftFora=f.filter(x=>!_daMinhaCozinha(x)).length;
+  if(_ftFora && !_verOutras) f=f.filter(_daMinhaCozinha);
+  if(_ftFora) w.appendChild(mkVerOutras(_ftFora,()=>drawFT(w)));
   if(_ftBusca) f=f.filter(x=>x.nome.toLowerCase().includes(_ftBusca.toLowerCase()));
   f=_ftOrdena(f.slice());
   // barra de ordenação
@@ -1932,6 +1980,8 @@ function drawFT(w){
     // ficha: nome + selos + revisar
     const nome=div('ft-nome');
     nome.appendChild(span('ft-nome-t',x.nome));
+    const _fcs=mkCozSelo(x.cozinha);   // QUEM FAZ (≠ dos selos de destino, que são quem serve)
+    if(_fcs){ _fcs.classList.add('ft-sel'); nome.appendChild(_fcs); }
     (x.destinos||[]).forEach(d=>{
       const s=span('ft-sel',DEST_LBL[d]||d); s.style.background=DEST_COR[d]||'#888'; nome.appendChild(s);
     });
