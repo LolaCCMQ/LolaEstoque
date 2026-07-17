@@ -588,7 +588,17 @@ const LOGO_SVG=`<?xml version="1.0" encoding="utf-8"?>
   hamBtn.innerHTML='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>';
   hamBtn.addEventListener('click',e=>{e.stopPropagation();sb.classList.contains('open')?closeSidebar():openSidebar();});
 
+  /* NOMEAR A COZINHA — pedido da Bianca (17/07): "está muito confuso, não dá pra
+     saber o que é o quê, se é Lola ou Central". O mesmo arquivo serve as três e o
+     cabeçalho dizia só "Estoque" em todas. Agora o nome da cozinha fica no topo,
+     na aba do navegador e (em modo não-padrão) numa faixa colorida. */
   const tbLeft=div('logo-area',[div('logo-svg-wrap',null,{html:LOGO_SVG}),div('logo-div'),span('logo-app','Estoque')]);
+  const _cozNome=APP_EH_CENTRAL?'Cozinha Central':(APP_COZ.length===1&&APP_COZ[0]==='mac')?'Cozinha MAC':(APP_COZ.length===1&&APP_COZ[0]==='ccmq')?'Cozinha CCMQ':'Lola — CCMQ e MAC';
+  const _cozCor=APP_EH_CENTRAL?'#2C5AA0':(APP_COZ.length===1&&APP_COZ[0]==='mac')?'#2C7A4B':'#C0392B';
+  const tbCoz=span('logo-coz',_cozNome);
+  tbCoz.style.cssText='margin-left:10px;font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#fff;background:'+_cozCor+';border-radius:50px;padding:3px 11px;white-space:nowrap';
+  tbLeft.appendChild(tbCoz);
+  try{ document.title=_cozNome+' — Estoque Lola'; }catch(_){}
   const tbRight=span('topbar-date',new Date().toLocaleDateString('pt-BR',{weekday:'short',day:'numeric',month:'short'}));
   const tb=div('topbar',[hamBtn,tbLeft,tbRight]);
 
