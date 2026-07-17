@@ -1381,8 +1381,31 @@ let _ppTab='todos',_ppBusca='';
    ⚠️ O filtro vale SÓ NA LISTA. O `_pp` global continua completo, senão o editor
    de ficha não acha o PP Requeijão (da Central) pra botar no Brie, e a ficha quebra.
    Some quando o pedido virar insumo do Lola (passo 4).                        */
-const APP_COZ=['ccmq','mac'];
+/* Qual cozinha este app está servindo. Vem da URL (?unidade=central), porque o
+   MESMO arquivo serve os dois: o portal abre sem parâmetro (= Lola: ccmq+mac) e
+   o app da Central abre esta tela por iframe com ?unidade=central.
+   Um app, dois modos — sem copiar o editor de ficha (450 linhas) pra lugar nenhum. */
+const APP_COZ=(function(){
+  try{
+    var u=(new URLSearchParams(location.search).get('unidade')||'').trim().toLowerCase();
+    if(u==='central') return ['central'];
+    if(u==='mac')     return ['mac'];
+    if(u==='ccmq')    return ['ccmq'];
+  }catch(_){}
+  return ['ccmq','mac'];          // padrão: o app do Lola
+})();
+const APP_EH_CENTRAL = APP_COZ.length===1 && APP_COZ[0]==='central';
 let _verOutras=false;
+/* Faixa fixa dizendo em que cozinha a pessoa está. O mesmo arquivo serve as duas
+   e as telas são idênticas — sem isto, alguém edita a ficha da outra achando que
+   é a sua. Só aparece quando NÃO é o padrão (o Lola), pra não poluir. */
+function mkFaixaCozinha(){
+  if(!APP_EH_CENTRAL) return null;
+  const w=div(null);
+  w.style.cssText='display:flex;align-items:center;gap:8px;background:#2C5AA0;color:#fff;border-radius:11px;padding:8px 13px;margin-bottom:12px;font-size:12px;font-weight:700';
+  w.innerHTML='<i class="ph-duotone ph-cooking-pot" style="font-size:16px"></i> Você está na <b style="text-decoration:underline">Cozinha Central</b> — o que criar aqui é da Central';
+  return w;
+}
 const COZ_LBL={ccmq:'CCMQ',mac:'MAC',central:'Central'};
 const COZ_COR={ccmq:'#C0392B',mac:'#2C7A4B',central:'#2C5AA0'};
 function _daMinhaCozinha(x){ return !x.cozinha || APP_COZ.indexOf(x.cozinha)>=0; }
@@ -1394,9 +1417,10 @@ function mkCozSelo(coz){
   return s;
 }
 function mkVerOutras(n,redraw){
+  const ondeOutros = APP_EH_CENTRAL ? 'no Lola' : 'na Central';
   const w=div(null);
   w.style.cssText='display:flex;align-items:center;gap:9px;background:#EAF1F7;border:1px solid #CFDFEE;border-radius:11px;padding:9px 12px;margin-bottom:10px;font-size:12px;color:#2C5AA0';
-  w.appendChild(el('span',null,null,{html:'<i class="ph-duotone ph-eye-slash"></i> <b>'+n+'</b> '+(n===1?'é feita':'são feitas')+' na Central — '+(_verOutras?'aparecendo abaixo':'escondida'+(n===1?'':'s')),style:'flex:1'}));
+  w.appendChild(el('span',null,null,{html:'<i class="ph-duotone ph-eye-slash"></i> <b>'+n+'</b> '+(n===1?'é feita':'são feitas')+' '+ondeOutros+' — '+(_verOutras?'aparecendo abaixo':'escondida'+(n===1?'':'s')),style:'flex:1'}));
   w.appendChild(btn('btn bo bxs',_verOutras?'Esconder':'Ver assim mesmo',()=>{_verOutras=!_verOutras;redraw();}));
   return w;
 }
@@ -1434,6 +1458,7 @@ function editarDestinosPP(pp, onSave){
 
 function drawPP(w){
   w.innerHTML='';
+  const _fx=mkFaixaCozinha(); if(_fx) w.appendChild(_fx);
   /* Abas agora por COZINHA, não por `categoria`. A categoria tinha 2 furos:
      as 26 de 'todos'/'bebida' não caíam em aba nenhuma (só em Tudo), e a aba
      Eventos vivia vazia (nenhuma PP tinha essa categoria). */
@@ -1780,6 +1805,9 @@ async function modalPrep(item){
     f.custo_por_unidade=(['g','ml'].includes(f.rendimento_un))?(f.custo_total/qtd)*1000:f.custo_total/qtd;
     if(!f.valor_venda_central||f.valor_venda_central===0)f.valor_venda_central=f.custo_por_unidade*1.7;
     const p={nome:f.nome,categoria:f.categoria,cat_custo:f.cat_custo||null,destinos:[..._selDestsPP],e_preparo:_isPre,rendimento_qtd:parseFloat(f.rendimento_qtd),rendimento_un:f.rendimento_un,porcao_qtd:parseFloat(f.porcao_qtd)||null,porcao_un:f.porcao_un||null,custo_total:f.custo_total,custo_por_unidade:f.custo_por_unidade,valor_venda_central:parseFloat(f.valor_venda_central),margem_venda:parseFloat(f.margem_venda)||70,modo_preparo:f.modo_preparo||null,observacoes:f.observacoes||null,editado_por:_autorPP.v||null,editado_em:new Date().toISOString()};
+    /* QUEM FAZ: nova nasce na cozinha do app (a Central abre com ?unidade=central).
+       Editando, respeita o que já está — não sequestra a receita de outra cozinha. */
+    p.cozinha = (ed && item && item.cozinha) ? item.cozinha : APP_COZ[0];
     let pid;
     if(ed){await db('lola_preproducoes','PATCH',p,'?id=eq.'+item.id);await db('lola_preproducoes_itens','DELETE',null,'?preproducao_id=eq.'+item.id);pid=item.id;}
     else{const[nv]=await db('lola_preproducoes','POST',p);pid=nv.id;}
@@ -1920,6 +1948,7 @@ function _ftOrdena(f){
 }
 function drawFT(w){
   w.innerHTML='';
+  const _fxf=mkFaixaCozinha(); if(_fxf) w.appendChild(_fxf);
   let f=_ftTab==='todos'?[..._ft]:
     _ftTab==='pre'?_ft.filter(x=>x.categoria==='pre'||x.categoria==='pre-producao'):
     _ftTab.indexOf('beb_')===0?_ft.filter(x=>x.cardapio===_ftTab.slice(4)&&x.categoria==='bebida'):
@@ -2504,6 +2533,9 @@ async function modalFicha(item){
     const cpp2=ings.length>0?ct2/parseFloat(f.rendimento_qtd||1):custoPorcaoFixo;
     const descricaoEd=document.getElementById('ft-descricao-edicao')?.value||'';
     const p={nome:f.nome,cardapio:f.cardapio,categoria:f.categoria,destinos:destSelectorFT.getDestinos(),e_preparo:!!f.e_preparo,produto_pronto:!!f.produto_pronto,rendimento_qtd:parseFloat(f.rendimento_qtd),rendimento_un:f.rendimento_un,preco_venda:parseFloat(f.preco_venda)||null,custo_total:ct2,custo_por_porcao:cpp2,modo_preparo:f.modo_preparo||null,observacoes:f.observacoes||null,editado_por:_autorFt.v||null,editado_em:new Date().toISOString()};
+    /* QUEM FAZ — mesma regra da pré-produção. Nova nasce na cozinha do app;
+       editando, mantém a de quem já era dona. */
+    p.cozinha = (ed && item && item.cozinha) ? item.cozinha : APP_COZ[0];
     let _capa=''; if(typeof fotos!=='undefined' && fotos && fotos.length){ try{ _capa=await _thumbP(fotos[0],320); }catch(e){} } p.capa=_capa;
     let fid;
     if(ed){
