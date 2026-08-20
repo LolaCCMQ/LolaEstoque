@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/duotone/style.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.js"></script>
 <style>
 :root{--v:#A82A2A;--ve:#7E1E1F;--rf:#FBF7F1;--rb:#ECE3D9;--rt:#F5E9E6;--rm:#B79A8E;--tx:#2A1A17;--ts:#5A463E;--vd:#2C7A4B;--am:#9A6B1E;}
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -503,6 +504,11 @@ td .sub{font-size:10px;color:var(--ts);margin-top:2px;}
 </head>
 <body>
 <div id="app"></div>
+<div id="bipCamOv" style="position:fixed;inset:0;background:#000;z-index:9999;display:none;flex-direction:column">
+  <button id="bipCamFechar" style="position:absolute;top:16px;right:16px;width:40px;height:40px;border-radius:50%;background:rgba(0,0,0,.5);color:#fff;border:0;font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer">&#10005;</button>
+  <video id="bipCamVideo" playsinline muted autoplay style="flex:1;width:100%;object-fit:cover;background:#000"></video>
+  <div id="bipCamStatus" style="position:absolute;left:0;right:0;bottom:70px;text-align:center;color:#fff;font-size:13px;font-weight:700;padding:0 20px;text-shadow:0 1px 4px rgba(0,0,0,.6)"></div>
+</div>
 <script>
 const SB='https://mvjbsdpfjhywhaonvpfl.supabase.co';
 const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im12amJzZHBmamh5d2hhb252cGZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MDk2OTAsImV4cCI6MjA5NTM4NTY5MH0.i_3sqgQa6umsIYBmAwWz_NP6nYuT3GfIZid24zHXSEI';
@@ -5094,7 +5100,7 @@ async function registrarRecebimento(p){
     const tbl=document.createElement('table');tbl.style.cssText='width:100%;border-collapse:collapse';
     const thead=document.createElement('thead');
     const htr=document.createElement('tr');
-    ['Item','Un','Qtd\u00a0solicitada','Qtd\u00a0recebida','Difer.'].forEach((h,i)=>{
+    ['Item','Un','Pedido','Enviado','Recebida','Difer.'].forEach((h,i)=>{
       const th=document.createElement('th');
       th.style.cssText='padding:7px 10px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--v);background:var(--rt);text-align:'+(i>=2?'right':'left');
       th.textContent=h;htr.appendChild(th);
@@ -5110,29 +5116,52 @@ async function registrarRecebimento(p){
         if(typeof content==='string'||typeof content==='number')td.textContent=String(content);
         else td.appendChild(content);return td;
       }
+      const ref=recvMap[it.id];
       tr.appendChild(mkTd(it.nome_item,'left','font-weight:600'));
       tr.appendChild(mkTd(it.unidade||''));
-      tr.appendChild(mkTd(N(it.quantidade,1),'right','font-weight:700'));
+      tr.appendChild(mkTd(N(ref.qtdPedida,1),'right','color:#8a8078'));
+      tr.appendChild(mkTd(N(ref.qtdEnviada,1),'right','font-weight:700'));
       // Input qtd recebida
       const tdRecv=document.createElement('td');tdRecv.style.cssText='padding:4px 10px;text-align:right';
       const inpR=document.createElement('input');inpR.type='number';inpR.min='0';inpR.step='0.5';
-      inpR.value=N(it.quantidade,1);
+      inpR.value=N(ref.qtdEnviada,1);
       inpR.style.cssText='width:80px;padding:5px 7px;border:2px solid var(--rb);border-radius:8px;font-size:13px;text-align:right;font-family:Manrope,sans-serif;font-weight:700';
       inpR.setAttribute('inputmode','decimal');
       const difTd=document.createElement('td');difTd.style.cssText='padding:8px 10px;font-size:12px;text-align:right;font-weight:700';
       function updateDif(){
-        const sol=parseFloat(it.quantidade)||0;const recv=parseFloat(inpR.value)||0;
+        const env=parseFloat(ref.qtdEnviada)||0;const recv=parseFloat(inpR.value)||0;
         recvMap[it.id].qtdRecebida=recv;
-        const dif=recv-sol;
+        const dif=recv-env;
         difTd.textContent=(dif>0?'+':'')+N(dif,1);
         difTd.style.color=dif===0?'var(--vd)':dif<0?'#dc2626':'#c47700';
         inpR.style.borderColor=dif===0?'var(--vd)':dif<0?'#dc2626':'#c47700';
       }
       inpR.addEventListener('input',updateDif);updateDif();
+      rowRefs[it.id]=inpR;
       tdRecv.appendChild(inpR);tr.appendChild(tdRecv);tr.appendChild(difTd);
       tbody.appendChild(tr);
     });
     tbl.appendChild(tbody);tblWrap.appendChild(tbl);mb.appendChild(tblWrap);
+    // bipagem: acha o item pelo nome (do QR LOLA:<lote>:<produto>:<unidade> ou texto livre) e soma 1
+    function bipAplicarRecv(raw){
+      raw=String(raw||'').trim();if(!raw)return;
+      const m=/^LOLA:([^:]*):([^:]*):([^:]*)$/.exec(raw);
+      const alvo=m?m[2]:raw;
+      const nAlvo=_bipNorm(alvo);
+      const achou=itens.find(it=>_bipNorm(it.nome_item)===nAlvo);
+      if(achou){
+        const inp=rowRefs[achou.id];
+        inp.value=(parseFloat(inp.value)||0)+1;
+        inp.dispatchEvent(new Event('input'));
+        bipFeed.textContent='✓ '+achou.nome_item+' — agora '+N(parseFloat(inp.value),1);
+        bipFeed.style.color='var(--vd)';
+      }else{
+        bipFeed.textContent='✗ "'+alvo+'" não está neste pedido';
+        bipFeed.style.color='#dc2626';
+      }
+    }
+    bipInp.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();bipAplicarRecv(bipInp.value);bipInp.value='';}});
+    bipCamBtn.addEventListener('click',()=>abrirBipCamera(bipAplicarRecv));
     // Footer
     mo.appendChild(div('mf',[
       btn('btn bg','Cancelar',()=>ov.remove()),
@@ -5140,20 +5169,24 @@ async function registrarRecebimento(p){
         const respVal=_resp.v.trim();
         if(!respVal){inpResp.style.borderColor='#dc2626';inpResp.focus();alert('Informe quem recebeu.');return;}
         const dataReceb=document.getElementById('inp-data-receb')?.value||new Date().toISOString().split('T')[0];
-        // Verificar divergências
-        const divergencias=Object.values(recvMap).filter(v=>parseFloat(v.qtdRecebida)!==parseFloat(v.item.quantidade));
+        // Verificar divergências (Recebido × Enviado)
+        const divergencias=Object.values(recvMap).filter(v=>parseFloat(v.qtdRecebida)!==parseFloat(v.qtdEnviada));
         const statusReceb=divergencias.length>0?'recebido_divergencia':'recebido_completo';
         // Salvar recebimento
         const[receb]=await db('lola_pedidos_recebimentos','POST',{
           pedido_id:p.id,recebido_por:respVal,data_recebimento:dataReceb,status:statusReceb
         });
-        // Salvar itens do recebimento
+        // Salvar itens do recebimento — qtd_solicitada guarda a referência da comparação
+        // (o Enviado, não o Pedido original) até existir a coluna qtd_enviada própria.
         for(const v of Object.values(recvMap)){
           await db('lola_pedidos_recebimentos_itens','POST',{
             recebimento_id:receb.id,pedido_item_id:v.item.id,
-            nome_item:v.item.nome_item,qtd_solicitada:parseFloat(v.item.quantidade)||0,
+            nome_item:v.item.nome_item,qtd_solicitada:parseFloat(v.qtdEnviada)||0,
             qtd_recebida:parseFloat(v.qtdRecebida)||0,unidade:v.item.unidade
           });
+          // best-effort: se a coluna qtd_enviada já existir (pós-migração), preenche ela
+          // também; se ainda não existir, o PATCH falha e é ignorado (não bloqueia o resto).
+          try{ await db('lola_pedidos_recebimentos_itens','PATCH',{qtd_enviada:parseFloat(v.qtdEnviada)||0},'?recebimento_id=eq.'+receb.id+'&pedido_item_id=eq.'+v.item.id); }catch(e){}
         }
         // Calcular novo valor total pela qtd recebida
         const itensParaValor=await db('lola_pedidos_itens','GET',null,'?pedido_id=eq.'+p.id);
@@ -5180,6 +5213,48 @@ async function registrarRecebimento(p){
       })
     ]));
   }catch(e){mb.innerHTML='<p style="color:red;padding:20px">'+e.message+'</p>';}
+}
+/* câmera de bipagem (chegada) — mesmo padrão da Central: BarcodeDetector nativo com
+   fallback jsQR, fica aberta lendo contínuo até fechar. Recebe um callback(texto) pra
+   não depender de qual tela chamou (recebimento aqui; outras telas podem reusar). */
+let BIP_CAM_STREAM=null, BIP_CAM_LOOP=null;
+async function abrirBipCamera(onLido){
+  const ov=document.getElementById('bipCamOv'),status=document.getElementById('bipCamStatus'),video=document.getElementById('bipCamVideo');
+  ov.style.display='flex';status.textContent='Abrindo câmera…';
+  document.getElementById('bipCamFechar').onclick=fecharBipCamera;
+  try{
+    BIP_CAM_STREAM=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    video.srcObject=BIP_CAM_STREAM;await video.play();
+    status.textContent='Aponte pro QR da etiqueta';
+    bipCamLoop(video,status,onLido);
+  }catch(e){ status.textContent='Não consegui abrir a câmera (permissão negada ou indisponível).'; }
+}
+function fecharBipCamera(){
+  const ov=document.getElementById('bipCamOv'); if(ov) ov.style.display='none';
+  if(BIP_CAM_LOOP) cancelAnimationFrame(BIP_CAM_LOOP);
+  if(BIP_CAM_STREAM){ BIP_CAM_STREAM.getTracks().forEach(t=>t.stop()); BIP_CAM_STREAM=null; }
+}
+function bipCamLoop(video,status,onLido){
+  const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');
+  const nativo='BarcodeDetector' in window;
+  const detector=nativo?new BarcodeDetector({formats:['qr_code']}):null;
+  let ultimo='',ultimoEm=0;
+  async function tick(){
+    if(!BIP_CAM_STREAM) return;
+    if(video.videoWidth){
+      canvas.width=video.videoWidth;canvas.height=video.videoHeight;
+      ctx.drawImage(video,0,0,canvas.width,canvas.height);
+      let texto=null;
+      try{
+        if(nativo){ const codes=await detector.detect(canvas); if(codes.length) texto=codes[0].rawValue; }
+        else if(window.jsQR){ const img=ctx.getImageData(0,0,canvas.width,canvas.height); const r=jsQR(img.data,img.width,img.height); if(r) texto=r.data; }
+      }catch(e){}
+      const agora=Date.now();
+      if(texto&&(texto!==ultimo||agora-ultimoEm>1500)){ ultimo=texto;ultimoEm=agora; onLido&&onLido(texto); status.textContent='Lido: '+texto; }
+    }
+    BIP_CAM_LOOP=requestAnimationFrame(tick);
+  }
+  tick();
 }
 
 async function verDivergencias(p,divs,data,resp){
@@ -5338,18 +5413,23 @@ function drawPed(w){
   w.innerHTML='';
   const f=pedFiltrados();
   if(!f.length){w.appendChild(em('📋','Nenhum pedido encontrado'));return;}
+  /* 19/08: vocabulário único de status (substitui o antigo status+central_status). A
+     Central controla solicitado→em_producao→pronto_entrega→enviado (não dá mais pra
+     pular status pelo dropdown daqui); o Lola só cancela (antes de "enviado") e recebe
+     (bipagem, só depois de "enviado"). confirmado/entregue eram valores mortos — ninguém
+     escrevia mais neles — e foram removidos. */
   const STATUS_COLORS={
     rascunho:'background:#F1EEE9;color:#6B6258',
+    solicitado:'background:#E6EEF8;color:#2C5AA0',
     em_producao:'background:#E6EEF8;color:#2C5AA0',
     pronto_entrega:'background:#FBF0DD;color:#9A6B1E',
+    enviado:'background:#E6EEF8;color:#2C5AA0',
     recebido_completo:'background:#E6F3EA;color:#2C7A4B',
     recebido_divergencia:'background:#FBF0DD;color:#9A6B1E',
     cancelado:'background:#FBEAE7;color:#B5302E',
-    solicitado:'background:#E6EEF8;color:#2C5AA0',
-    confirmado:'background:#FBF0DD;color:#9A6B1E',
-    entregue:'background:#F1E7FA;color:#6B4FA8',
   };
-  const STATUS_LBL={em_producao:'Em produção',pronto_entrega:'Pronto para entrega',recebido_completo:'Recebido completo',recebido_divergencia:'Recebido c/ diverg.',cancelado:'Cancelado',solicitado:'Em produção',confirmado:'Pronto para entrega',entregue:'Entregue'};
+  const STATUS_LBL={solicitado:'Solicitado',em_producao:'Em produção',pronto_entrega:'Pronto para entrega',enviado:'A caminho — bipar recebimento',recebido_completo:'Recebido completo',recebido_divergencia:'Recebido c/ diverg.',cancelado:'Cancelado'};
+  const STATUS_IC={solicitado:'ph-clock',em_producao:'ph-cooking-pot',pronto_entrega:'ph-package',enviado:'ph-truck',recebido_completo:'ph-check-circle',recebido_divergencia:'ph-warning',cancelado:'ph-x-circle'};
   const wrap=document.createElement('div');
   f.forEach(p=>{
     const card=div('ped-card');
@@ -5359,19 +5439,12 @@ function drawPed(w){
       el('span','ped-val',R(p.valor_total))
     ]));
     card.appendChild(div('ped-meta',[DBR(p.data_pedido)+(p.responsavel?(' · por '+p.responsavel):(p.observacoes?(' · '+p.observacoes):''))]));
-    // status
+    // status — só leitura; quem avança é a Central (ou o próprio Lola no Enviar/Cancelar/Receber abaixo)
     const st=div('ped-status');
     if(p.status==='rascunho'){
       st.appendChild(el('span',null,null,{html:'<i class="ph-duotone ph-note-pencil"></i> Rascunho',style:'display:inline-flex;align-items:center;gap:6px;background:#F1EEE9;color:#6B6258;font-size:12px;font-weight:700;padding:7px 12px;border-radius:11px'}));
     } else {
-      const sel=document.createElement('select');
-      function applySelStyle(status){sel.style.cssText='padding:8px 13px;font-size:12px;font-weight:700;border-radius:11px;border:none;cursor:pointer;font-family:Manrope,sans-serif;'+(STATUS_COLORS[status]||'');}
-      applySelStyle(p.status);
-      ['em_producao','pronto_entrega','recebido_completo','recebido_divergencia','cancelado'].forEach(s=>{
-        const o=document.createElement('option');o.value=s;o.textContent=STATUS_LBL[s]||s;if(s===p.status)o.selected=true;sel.appendChild(o);
-      });
-      sel.addEventListener('change',async e=>{await db('lola_pedidos','PATCH',{status:e.target.value},'?id=eq.'+p.id);p.status=e.target.value;applySelStyle(e.target.value);});
-      st.appendChild(sel);
+      st.appendChild(el('span',null,null,{html:'<i class="ph-duotone '+(STATUS_IC[p.status]||'ph-circle')+'"></i> '+(STATUS_LBL[p.status]||p.status),style:'display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:7px 12px;border-radius:11px;'+(STATUS_COLORS[p.status]||'')}));
     }
     card.appendChild(st);
     // botões (compactos, 1 linha)
@@ -5388,12 +5461,20 @@ function drawPed(w){
         _peds=await db('lola_pedidos','GET',null,'?select=*&order=created_at.desc');
         drawPed($('#ped-t'));
       }));
-    } else if(p.status==='em_producao'||p.status==='pronto_entrega'||p.status==='solicitado'||p.status==='confirmado'){
+    } else if(p.status==='enviado'){
       btns.appendChild(pab('ph-tray-arrow-down','Receber','recv',()=>registrarRecebimento(p)));
       btns.appendChild(pab('ph-printer','Imprimir','',()=>imprimirPed(p)));
     } else if(p.status==='recebido_divergencia'){
       btns.appendChild(pab('ph-warning','Diverg.','warn',()=>verDivergencias(p,null,null,null)));
       btns.appendChild(pab('ph-printer','Imprimir','',()=>imprimirPed(p)));
+    } else if(p.status==='solicitado'||p.status==='em_producao'||p.status==='pronto_entrega'){
+      btns.appendChild(pab('ph-printer','Imprimir','',()=>imprimirPed(p)));
+      btns.appendChild(pab('ph-x-circle','Cancelar','warn',async()=>{
+        if(!confirm('Cancelar o pedido #'+p.numero_pedido+'? A Central vai ver que foi cancelado.'))return;
+        await db('lola_pedidos','PATCH',{status:'cancelado'},'?id=eq.'+p.id);
+        p.status='cancelado';
+        drawPed($('#ped-t'));
+      }));
     } else {
       btns.appendChild(pab('ph-printer','Imprimir','',()=>imprimirPed(p)));
     }
